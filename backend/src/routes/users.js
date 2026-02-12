@@ -10,9 +10,16 @@ import { Like } from '../models/Like.js';
 import { Comment } from '../models/Comment.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
 import { Superlative } from '../models/Superlative.js';
+import multer from 'multer';
+import fs from 'fs/promises';
+import { uploadProfileImage, deleteImage } from '../services/imageService.js';
 
 const router = express.Router();
 const profanityFilter = new Filter();
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
 
 // Helper to check freeze
 async function ensureNotFrozen(batchId) {
@@ -54,6 +61,12 @@ router.get('/me', authRequired, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    if (err.name === 'ValidationError') {
+      const firstKey = Object.keys(err.errors)[0];
+      const message =
+        err.errors[firstKey]?.message || 'Validation failed for profile update';
+      return res.status(400).json({ error: message });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -216,14 +229,22 @@ router.post('/:userId/like', authRequired, async (req, res) => {
       });
     }
 
-    const likeCount = await Like.countDocuments({
-      toUserId: userId,
-      isSuperlike: false,
-    });
+    const [likeCount, superlikeCount] = await Promise.all([
+      Like.countDocuments({ toUserId: userId, isSuperlike: false }),
+      Like.countDocuments({ toUserId: userId, isSuperlike: true }),
+    ]);
 
     return res.json({
-      message: existing ? 'Like removed' : 'Like added',
+      message: existing
+        ? is_superlike
+          ? 'Superlike removed'
+          : 'Like removed'
+        : is_superlike
+        ? 'Superlike added'
+        : 'Like added',
       like_count: likeCount,
+      superlike_count: superlikeCount,
+      is_superlike: !!is_superlike,
     });
   } catch (err) {
     console.error(err);
@@ -284,6 +305,84 @@ router.post('/:userId/comments', authRequired, async (req, res) => {
   }
 });
 
+// PATCH /api/v1/users/me/comments/visibility
+router.patch('/me/comments/visibility', authRequired, async (req, res) => {
+  try {
+    const { is_visible: isVisible } = req.body;
+    if (typeof isVisible !== 'boolean') {
+      return res.status(400).json({ error: 'is_visible must be a boolean' });
+    }
+
+    await Comment.updateMany(
+      { toUserId: req.user._id },
+      { $set: { isVisible } },
+    );
+
+    const visibleCount = await Comment.countDocuments({
+      toUserId: req.user._id,
+      isVisible: true,
+    });
+
+    return res.json({
+      message: 'Comment visibility updated',
+      visible_count: visibleCount,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/v1/users/me/profile-picture
+router.post(
+  '/me/profile-picture',
+  authRequired,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const user = req.user;
+      const userBatch = await UserBatch.findOne({
+        userId: user._id,
+        isPrimary: true,
+      });
+      if (userBatch) {
+        const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
+        if (frozen) {
+          return res.status(403).json({
+            error: 'Profile editing disabled after freeze date',
+            freeze_date: batch.freezeDate,
+          });
+        }
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'File is required' });
+      }
+
+      const uploadResult = await uploadProfileImage(req.file.path, user._id);
+
+      // Clean up local temp file
+      await fs.unlink(req.file.path).catch(() => {});
+
+      if (user.cloudinaryPublicId && user.cloudinaryPublicId !== uploadResult.public_id) {
+        await deleteImage(user.cloudinaryPublicId);
+      }
+
+      user.profilePictureUrl = uploadResult.secure_url;
+      user.cloudinaryPublicId = uploadResult.public_id;
+      await user.save();
+
+      return res.json({
+        profile_picture_url: user.profilePictureUrl,
+        cloudinary_public_id: user.cloudinaryPublicId,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
 // GET /api/v1/users/:userId
 router.get('/:userId', authRequired, async (req, res) => {
   try {
@@ -293,12 +392,22 @@ router.get('/:userId', authRequired, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const isOwner = req.user._id.toString() === userId;
+
     const [likeCount, superlikeCount] = await Promise.all([
       Like.countDocuments({ toUserId: userId, isSuperlike: false }),
       Like.countDocuments({ toUserId: userId, isSuperlike: true }),
     ]);
 
-    const comments = await Comment.find({ toUserId: userId })
+    const commentFilter = { toUserId: userId };
+    if (!isOwner) {
+      // non-owners can only see comments that the profile owner has marked visible
+      // (public comments)
+      // @ts-ignore runtime only
+      commentFilter.isVisible = true;
+    }
+
+    const comments = await Comment.find(commentFilter)
       .sort({ createdAt: -1 })
       .limit(10)
       .populate('fromUserId', 'fullName profilePictureUrl')
@@ -357,6 +466,7 @@ router.get('/:userId', authRequired, async (req, res) => {
         created_at: c.createdAt,
         is_visible: c.isVisible,
       })),
+      is_owner: isOwner,
       current_user_interactions: {
         has_liked: !!hasLiked,
         has_superliked: !!hasSuperliked,

@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -10,6 +10,18 @@ type Profile = {
   bio?: string;
   like_count: number;
   superlike_count: number;
+  is_owner?: boolean;
+  comments?: {
+    id: string;
+    from_user: {
+      id: string;
+      full_name: string;
+      profile_picture_url?: string;
+    };
+    content: string;
+    created_at: string;
+    is_visible: boolean;
+  }[];
 };
 
 export function ProfilePage() {
@@ -18,6 +30,7 @@ export function ProfilePage() {
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -35,13 +48,22 @@ export function ProfilePage() {
     }
   }, [userId]);
 
+  const hasPublicComments = useMemo(
+    () => !!profile?.comments?.some((c) => c.is_visible),
+    [profile],
+  );
+
   async function toggleLike(isSuperlike: boolean) {
     try {
       const res = await api.post(`/api/v1/users/${userId}/like`, {
         is_superlike: isSuperlike,
       });
-      if (profile && !isSuperlike) {
-        setProfile({ ...profile, like_count: res.data.like_count });
+      if (profile) {
+        setProfile({
+          ...profile,
+          like_count: res.data.like_count,
+          superlike_count: res.data.superlike_count,
+        });
       }
     } catch {
       // ignore for now
@@ -60,6 +82,30 @@ export function ProfilePage() {
     }
   }
 
+  async function toggleCommentsVisibility() {
+    if (!profile?.is_owner) return;
+    setVisibilityLoading(true);
+    try {
+      const newVisible = !hasPublicComments;
+      await api.patch('/api/v1/users/me/comments/visibility', {
+        is_visible: newVisible,
+      });
+      if (profile.comments) {
+        setProfile({
+          ...profile,
+          comments: profile.comments.map((c) => ({
+            ...c,
+            is_visible: newVisible,
+          })),
+        });
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error ?? 'Failed to update visibility');
+    } finally {
+      setVisibilityLoading(false);
+    }
+  }
+
   if (loading) return <p className="center">Loading profile...</p>;
   if (error) return <p className="center">{error}</p>;
   if (!profile) return <p className="center">Profile not found</p>;
@@ -67,6 +113,13 @@ export function ProfilePage() {
   return (
     <div className="home">
       <header className="top-bar">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => (window.location.href = '/directory')}
+        >
+          ← Back
+        </button>
         <h1>Yearbook</h1>
       </header>
       <main className="profile-main">
@@ -90,7 +143,52 @@ export function ProfilePage() {
           </div>
         </div>
         <section className="comments-section">
-          <h3>Leave a comment</h3>
+          <h3>Comments</h3>
+          {profile.is_owner && (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={toggleCommentsVisibility}
+                disabled={visibilityLoading}
+              >
+                {visibilityLoading
+                  ? 'Updating...'
+                  : hasPublicComments
+                  ? 'Hide comments from public'
+                  : 'Show my comments publicly'}
+              </button>
+            </div>
+          )}
+          {profile.comments && profile.comments.length > 0 && (
+            <ul style={{ marginBottom: '1rem', paddingLeft: 0, listStyle: 'none' }}>
+              {profile.comments.map((c) => (
+                <li key={c.id} style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="avatar">
+                      {c.from_user.profile_picture_url ? (
+                        <img
+                          src={c.from_user.profile_picture_url}
+                          alt={c.from_user.full_name}
+                        />
+                      ) : (
+                        <span>{c.from_user.full_name[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <strong>{c.from_user.full_name}</strong>
+                      {profile.is_owner && (
+                        <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>
+                          {c.is_visible ? 'Public' : 'Private'}
+                        </span>
+                      )}
+                      <div style={{ fontSize: '0.875rem' }}>{c.content}</div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <h4>Leave a comment</h4>
           <form onSubmit={submitComment}>
             <textarea
               value={comment}

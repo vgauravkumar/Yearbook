@@ -46,6 +46,13 @@ export function DirectoryPage() {
   return (
     <div className="home">
       <header className="top-bar">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => (window.location.href = '/')}
+        >
+          ← Back
+        </button>
         <h1>Yearbook</h1>
       </header>
       <main>

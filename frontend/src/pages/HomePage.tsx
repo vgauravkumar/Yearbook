@@ -52,9 +52,14 @@ export function HomePage() {
       <main>
         <h2>Welcome to your Yearbook</h2>
         <p>Jump into your batch directory to see everyone.</p>
-        <button onClick={() => (window.location.href = '/directory')}>
-          Open Directory
-        </button>
+        <div className="primary-actions">
+          <button onClick={() => (window.location.href = '/directory')}>
+            Open Directory
+          </button>
+          <button onClick={() => (window.location.href = '/profile/edit')}>
+            Edit My Profile
+          </button>
+        </div>
       </main>
     </div>
   );
