@@ -372,6 +372,12 @@ button {
   gap: 1rem;
 }
 
+.auth-layout-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-start;
+}
+
 .auth-hero,
 .auth-panel {
   padding: clamp(1.35rem, 2.5vw, 2.2rem);
@@ -1130,6 +1136,25 @@ button {
 
 .flow-card h3 {
   font-size: 1.1rem;
+}
+
+.landing-dev-cta {
+  padding: 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+  border-color: rgba(255, 143, 82, 0.45);
+  background: linear-gradient(145deg, rgba(255, 239, 229, 0.96), rgba(232, 245, 255, 0.94));
+  box-shadow: 0 12px 26px rgba(255, 143, 82, 0.14);
+}
+
+.landing-dev-cta h3 {
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+}
+
+.landing-dev-cta .eyebrow {
+  color: #a4552a;
 }
 
 .hub-page {

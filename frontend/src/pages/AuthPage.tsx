@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { getApiErrorMessage } from '../utils/errors';
 
@@ -46,6 +46,12 @@ export function AuthPage() {
   return (
     <div className="page-shell auth-page">
       <div className="auth-layout">
+        <div className="auth-layout-meta">
+          <Link className="btn btn-ghost btn-sm" to="/">
+            Back to landing
+          </Link>
+        </div>
+
         <section className="panel auth-hero">
           <p className="eyebrow">Digital Yearbook</p>
           <h1>Save your class memories in one place.</h1>

@@ -3,6 +3,7 @@ import { AuthPage } from './pages/AuthPage';
 import { DirectoryPage } from './pages/DirectoryPage';
 import { HomePage } from './pages/HomePage';
 import { OnboardingPage } from './pages/OnboardingPage';
+import PortfolioPage from './pages/PortfolioPage';
 import { ProfileEditPage } from './pages/ProfileEditPage';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -16,6 +17,7 @@ function App() {
         <Route path="/directory" element={<Navigate to="/app" replace />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/profile/edit" element={<ProfileEditPage />} />
+        <Route path="/resume" element={<PortfolioPage />} />
         <Route path="/" element={<HomePage />} />
       </Routes>
     </BrowserRouter>

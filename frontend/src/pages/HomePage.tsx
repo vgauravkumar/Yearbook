@@ -131,6 +131,15 @@ export function HomePage() {
             <p>Save bookmarks, personal notes, and class momentum in one memory lane.</p>
           </article>
         </section>
+
+        <section className="panel landing-dev-cta">
+          <p className="eyebrow">Built with intent</p>
+          <h3>Want to know the developer behind this product?</h3>
+          <p>Explore the full profile, experience timeline, and projects.</p>
+          <Link className="btn btn-secondary" to="/resume">
+            Know about the developer
+          </Link>
+        </section>
       </main>
     </div>
   );
