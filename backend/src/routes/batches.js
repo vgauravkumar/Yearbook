@@ -7,19 +7,43 @@ import { Superlative } from '../models/Superlative.js';
 
 const router = express.Router();
 
-// GET /api/v1/batches/:batchId/students?page=1&limit=50
+function getTrendingScore(student) {
+  const superlativeVotes = student.superlatives.reduce(
+    (sum, entry) => sum + entry.vote_count,
+    0,
+  );
+
+  return student.like_count + student.superlike_count * 2 + superlativeVotes * 1.5;
+}
+
+function applySort(students, sortMode) {
+  if (sortMode === 'alphabetical') {
+    return students.sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+
+  if (sortMode === 'support') {
+    return students.sort((a, b) => {
+      if (b.superlike_count !== a.superlike_count) {
+        return b.superlike_count - a.superlike_count;
+      }
+      return b.like_count - a.like_count;
+    });
+  }
+
+  return students.sort((a, b) => getTrendingScore(b) - getTrendingScore(a));
+}
+
+// GET /api/v1/batches/:batchId/students?page=1&limit=50&sort=trending&search=abc
 router.get('/:batchId/students', async (req, res) => {
   try {
     const { batchId } = req.params;
     const page = Number(req.query.page ?? '1');
     const limit = Number(req.query.limit ?? '50');
+    const sortMode = (req.query.sort ?? 'trending').toString().toLowerCase();
+    const search = (req.query.search ?? '').toString().trim().toLowerCase();
 
-    const userBatchDocs = await UserBatch.find({ batchId })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
-
-    const userIds = userBatchDocs.map((ub) => ub.userId);
+    const userBatchDocs = await UserBatch.find({ batchId }, { userId: 1 }).lean();
+    const userIds = userBatchDocs.map((entry) => entry.userId);
 
     const users = await User.find(
       { _id: { $in: userIds } },
@@ -61,43 +85,62 @@ router.get('/:batchId/students', async (req, res) => {
     const votesByUser = new Map();
     for (const row of superlativeVotes) {
       const userId = row._id.toUserId.toString();
-      const supId = row._id.superlativeId.toString();
-      if (!votesByUser.has(userId)) votesByUser.set(userId, new Map());
-      votesByUser.get(userId).set(supId, row.count);
+      const superlativeId = row._id.superlativeId.toString();
+
+      if (!votesByUser.has(userId)) {
+        votesByUser.set(userId, new Map());
+      }
+
+      votesByUser.get(userId).set(superlativeId, row.count);
     }
 
     const superlativeById = new Map(
-      superlatives.map((s) => [s._id.toString(), s]),
+      superlatives.map((entry) => [entry._id.toString(), entry]),
     );
 
-    const students = users.map((u) => {
-      const id = u._id.toString();
+    let students = users.map((user) => {
+      const id = user._id.toString();
       const voteMap = votesByUser.get(id) ?? new Map();
-      const slist = Array.from(voteMap.entries()).map(([supId, count]) => {
-        const sup = superlativeById.get(supId);
-        return {
-          id: supId,
-          name: sup?.name ?? 'Unknown',
-          vote_count: count,
-        };
-      });
+      const superlativeSummary = Array.from(voteMap.entries()).map(
+        ([superlativeId, count]) => {
+          const superlative = superlativeById.get(superlativeId);
+          return {
+            id: superlativeId,
+            name: superlative?.name ?? 'Unknown',
+            vote_count: count,
+          };
+        },
+      );
 
       return {
         id,
-        full_name: u.fullName,
-        profile_picture_url: u.profilePictureUrl,
-        bio: u.bio,
+        full_name: user.fullName,
+        profile_picture_url: user.profilePictureUrl,
+        bio: user.bio,
         like_count: likeMap.get(id) ?? 0,
         superlike_count: superlikeMap.get(id) ?? 0,
-        superlatives: slist,
+        superlatives: superlativeSummary,
       };
     });
 
-    const totalStudents = await UserBatch.countDocuments({ batchId });
-    const totalPages = Math.ceil(totalStudents / limit);
+    if (search) {
+      students = students.filter((student) => {
+        const inName = student.full_name.toLowerCase().includes(search);
+        const inBio = (student.bio ?? '').toLowerCase().includes(search);
+        return inName || inBio;
+      });
+    }
+
+    students = applySort(students, sortMode);
+
+    const totalStudents = students.length;
+    const totalPages = Math.max(Math.ceil(totalStudents / limit), 1);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const pagedStudents = students.slice(startIndex, endIndex);
 
     return res.json({
-      students,
+      students: pagedStudents,
       pagination: {
         current_page: page,
         total_pages: totalPages,
@@ -111,4 +154,3 @@ router.get('/:batchId/students', async (req, res) => {
 });
 
 export default router;
-

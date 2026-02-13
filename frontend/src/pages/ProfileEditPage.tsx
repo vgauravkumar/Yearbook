@@ -209,7 +209,7 @@ export function ProfileEditPage() {
         });
       }
 
-      navigate('/');
+      navigate('/app');
     } catch (errorValue: unknown) {
       setError(getApiErrorMessage(errorValue, 'Failed to update profile'));
     } finally {
@@ -267,7 +267,7 @@ export function ProfileEditPage() {
     <div className="page-shell edit-page">
       <header className="top-nav">
         <div className="brand-wrap">
-          <button type="button" className="btn btn-ghost" onClick={() => navigate('/')}>
+          <button type="button" className="btn btn-ghost" onClick={() => navigate('/app')}>
             Back
           </button>
           <div>

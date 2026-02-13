@@ -92,7 +92,7 @@ export function OnboardingPage() {
         graduation_year: year,
         graduation_month: month,
       });
-      navigate('/');
+      navigate('/profile/edit');
     } catch (errorValue: unknown) {
       setError(getApiErrorMessage(errorValue, 'Something went wrong'));
     } finally {

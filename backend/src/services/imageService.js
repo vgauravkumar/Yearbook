@@ -20,8 +20,20 @@ export async function uploadProfileImage(filePath, userId) {
   return result;
 }
 
+export async function uploadMemoryMedia(filePath, userId) {
+  const result = await cloudinary.uploader.upload(filePath, {
+    folder: 'memories',
+    public_id: `memory_${userId}_${Date.now()}`,
+    resource_type: 'auto',
+    overwrite: false,
+    quality: 'auto',
+    fetch_format: 'auto',
+  });
+
+  return result;
+}
+
 export async function deleteImage(publicId) {
   if (!publicId) return;
   await cloudinary.uploader.destroy(publicId);
 }
-

@@ -22,12 +22,10 @@ const LikeSchema = new mongoose.Schema(
   },
 );
 
-LikeSchema.index(
-  { fromUserId: 1, toUserId: 1, isSuperlike: 1 },
-  { unique: true },
-);
+// A user can have only one active reaction per profile:
+// either like OR superlike.
+LikeSchema.index({ fromUserId: 1, toUserId: 1 }, { unique: true });
 LikeSchema.index({ toUserId: 1 });
 LikeSchema.index({ fromUserId: 1 });
 
 export const Like = mongoose.model('Like', LikeSchema);
-

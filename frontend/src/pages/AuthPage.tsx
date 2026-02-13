@@ -34,7 +34,7 @@ export function AuthPage() {
       } else {
         const response = await api.post('/api/v1/auth/login', { email, password });
         localStorage.setItem('access_token', response.data.access_token);
-        navigate('/');
+        navigate('/app');
       }
     } catch (errorValue: unknown) {
       setError(getApiErrorMessage(errorValue, 'Something went wrong'));

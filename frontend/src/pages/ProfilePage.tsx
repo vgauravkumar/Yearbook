@@ -172,6 +172,10 @@ export function ProfilePage() {
         is_superlike: isSuperlike,
       });
 
+      const interactions = response.data.current_user_interactions as
+        | { has_liked: boolean; has_superliked: boolean }
+        | undefined;
+
       setProfile((previous) => {
         if (!previous) return previous;
 
@@ -180,13 +184,10 @@ export function ProfilePage() {
           like_count: response.data.like_count,
           superlike_count: response.data.superlike_count,
           current_user_interactions: {
-            ...previous.current_user_interactions,
-            has_liked: isSuperlike
-              ? previous.current_user_interactions.has_liked
-              : !previous.current_user_interactions.has_liked,
-            has_superliked: isSuperlike
-              ? !previous.current_user_interactions.has_superliked
-              : previous.current_user_interactions.has_superliked,
+            has_liked: interactions?.has_liked ?? previous.current_user_interactions.has_liked,
+            has_superliked:
+              interactions?.has_superliked ??
+              previous.current_user_interactions.has_superliked,
           },
         };
       });
@@ -301,9 +302,9 @@ export function ProfilePage() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => navigate('/directory')}
+            onClick={() => navigate('/app')}
           >
-            Back to directory
+            Back to hub
           </button>
         </section>
       </div>
@@ -317,7 +318,7 @@ export function ProfilePage() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => navigate('/directory')}
+            onClick={() => navigate('/app')}
           >
             Back
           </button>

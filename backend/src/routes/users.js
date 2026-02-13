@@ -189,7 +189,7 @@ router.put('/me', authRequired, async (req, res) => {
 router.post('/:userId/like', authRequired, async (req, res) => {
   try {
     const { userId } = req.params;
-    const { is_superlike } = req.body;
+    const desiredSuperlike = !!req.body?.is_superlike;
 
     if (userId === req.user._id.toString()) {
       return res.status(400).json({ error: 'Cannot like your own profile' });
@@ -213,20 +213,46 @@ router.post('/:userId/like', authRequired, async (req, res) => {
       });
     }
 
-    const existing = await Like.findOne({
+    const existingReactions = await Like.find({
       fromUserId: req.user._id,
       toUserId: userId,
-      isSuperlike: !!is_superlike,
-    });
+    }).sort({ createdAt: -1 });
 
-    if (existing) {
-      await existing.deleteOne();
-    } else {
+    let message = '';
+    let hasLiked = false;
+    let hasSuperliked = false;
+
+    if (existingReactions.length === 0) {
       await Like.create({
         fromUserId: req.user._id,
         toUserId: userId,
-        isSuperlike: !!is_superlike,
+        isSuperlike: desiredSuperlike,
       });
+      message = desiredSuperlike ? 'Superlike added' : 'Like added';
+      hasLiked = !desiredSuperlike;
+      hasSuperliked = desiredSuperlike;
+    } else {
+      const [latestReaction, ...staleReactions] = existingReactions;
+
+      // Defensive cleanup for old data where both like and superlike existed.
+      if (staleReactions.length > 0) {
+        await Like.deleteMany({
+          _id: { $in: staleReactions.map((entry) => entry._id) },
+        });
+      }
+
+      if (latestReaction.isSuperlike === desiredSuperlike) {
+        await latestReaction.deleteOne();
+        message = desiredSuperlike ? 'Superlike removed' : 'Like removed';
+        hasLiked = false;
+        hasSuperliked = false;
+      } else {
+        latestReaction.isSuperlike = desiredSuperlike;
+        await latestReaction.save();
+        message = desiredSuperlike ? 'Switched to superlike' : 'Switched to like';
+        hasLiked = !desiredSuperlike;
+        hasSuperliked = desiredSuperlike;
+      }
     }
 
     const [likeCount, superlikeCount] = await Promise.all([
@@ -235,16 +261,13 @@ router.post('/:userId/like', authRequired, async (req, res) => {
     ]);
 
     return res.json({
-      message: existing
-        ? is_superlike
-          ? 'Superlike removed'
-          : 'Like removed'
-        : is_superlike
-        ? 'Superlike added'
-        : 'Like added',
+      message,
       like_count: likeCount,
       superlike_count: superlikeCount,
-      is_superlike: !!is_superlike,
+      current_user_interactions: {
+        has_liked: hasLiked,
+        has_superliked: hasSuperliked,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -435,16 +458,12 @@ router.get('/:userId', authRequired, async (req, res) => {
       };
     });
 
-    const hasLiked = await Like.exists({
+    const currentReaction = await Like.findOne({
       fromUserId: req.user._id,
       toUserId: userId,
-      isSuperlike: false,
-    });
-    const hasSuperliked = await Like.exists({
-      fromUserId: req.user._id,
-      toUserId: userId,
-      isSuperlike: true,
-    });
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.json({
       id: user._id,
@@ -468,8 +487,8 @@ router.get('/:userId', authRequired, async (req, res) => {
       })),
       is_owner: isOwner,
       current_user_interactions: {
-        has_liked: !!hasLiked,
-        has_superliked: !!hasSuperliked,
+        has_liked: !!currentReaction && !currentReaction.isSuperlike,
+        has_superliked: !!currentReaction && currentReaction.isSuperlike,
       },
     });
   } catch (err) {
@@ -479,4 +498,3 @@ router.get('/:userId', authRequired, async (req, res) => {
 });
 
 export default router;
-

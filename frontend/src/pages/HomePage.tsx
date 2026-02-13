@@ -1,145 +1,135 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { getApiErrorMessage } from '../utils/errors';
-import { formatBatchLabel, formatFreezeDate, isBatchFrozen, type BatchInfo } from '../utils/yearbook';
 
-type MeResponse = {
-  id: string;
-  full_name: string;
-  email: string;
+type SessionResponse = {
   has_completed_onboarding: boolean;
-  batch: BatchInfo | null;
 };
+
+const HERO_IMAGES = [
+  'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1100&q=80',
+  'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1100&q=80',
+  'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1100&q=80',
+  'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1100&q=80',
+];
 
 export function HomePage() {
   const navigate = useNavigate();
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    async function loadCurrentUser() {
+    async function routeAuthenticatedUsers() {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setCheckingSession(false);
+        return;
+      }
+
       try {
         const response = await api.get('/api/v1/users/me');
-        const user: MeResponse = response.data;
-        setMe(user);
+        const session: SessionResponse = response.data;
 
-        if (!user.has_completed_onboarding) {
-          navigate('/onboarding');
+        if (session.has_completed_onboarding) {
+          navigate('/app', { replace: true });
+        } else {
+          navigate('/onboarding', { replace: true });
         }
-      } catch (errorValue: unknown) {
-        setError(getApiErrorMessage(errorValue, 'Unable to load your account'));
-      } finally {
-        setLoading(false);
+      } catch {
+        localStorage.removeItem('access_token');
+        setCheckingSession(false);
       }
     }
 
-    loadCurrentUser();
+    routeAuthenticatedUsers();
   }, [navigate]);
 
-  const batchLabel = useMemo(() => formatBatchLabel(me?.batch ?? null), [me?.batch]);
-  const frozen = useMemo(() => isBatchFrozen(me?.batch ?? null), [me?.batch]);
-  const freezeDateLabel = useMemo(() => formatFreezeDate(me?.batch ?? null), [me?.batch]);
-
-  function handleLogout() {
-    localStorage.removeItem('access_token');
-    navigate('/auth');
-  }
-
-  if (loading) {
+  if (checkingSession) {
     return (
-      <div className="page-shell">
-        <div className="loading-screen">Loading your yearbook...</div>
-      </div>
-    );
-  }
-
-  if (!me) {
-    return (
-      <div className="page-shell">
-        <section className="panel unauth-shell">
-          <h1>Welcome to Yearbook</h1>
-          <p>{error ?? 'You need to log in to open your batch.'}</p>
-          <Link className="btn btn-primary" to="/auth">
-            Go to login
-          </Link>
-        </section>
+      <div className="page-shell landing-page">
+        <div className="loading-screen">Loading yearbook...</div>
       </div>
     );
   }
 
   return (
-    <div className="page-shell home-page">
-      <header className="top-nav">
+    <div className="page-shell landing-page">
+      <header className="landing-nav panel">
         <div className="brand-wrap">
           <span className="brand-mark">YB</span>
           <div>
             <p className="eyebrow">Digital Yearbook</p>
-            <h1>Home</h1>
+            <h1>Campus memories, remixed.</h1>
           </div>
         </div>
 
         <div className="nav-actions">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => navigate('/profile/edit')}
-          >
-            Edit profile
-          </button>
-          <button type="button" className="btn btn-danger" onClick={handleLogout}>
-            Logout
-          </button>
+          <Link className="btn btn-ghost" to="/auth">
+            Log in
+          </Link>
+          <Link className="btn btn-primary" to="/auth">
+            Start now
+          </Link>
         </div>
       </header>
 
-      <main className="home-grid">
-        <section className="panel hero-panel">
-          <p className="eyebrow">Hey {me.full_name.split(' ')[0]}</p>
-          <h2>Your class memories, all in one timeline.</h2>
-          <p>
-            Browse your classmates, react to profiles, and keep the yearbook alive
-            until your batch freeze date.
-          </p>
+      <main className="landing-shell">
+        <section className="panel landing-hero">
+          <div className="landing-copy">
+            <p className="eyebrow">Gen Z Yearbook Experience</p>
+            <h2>Not a dusty PDF. A living memory feed for your class.</h2>
+            <p>
+              Discover batchmates, react in real time, pin your favorites, and explore
+              your class pulse in one app.
+            </p>
+            <div className="landing-cta-row">
+              <Link className="btn btn-primary" to="/auth">
+                Build my yearbook
+              </Link>
+              <Link className="btn btn-secondary" to="/auth">
+                See live campus hub
+              </Link>
+            </div>
+            <div className="landing-metrics">
+              <div>
+                <strong>Instant Profiles</strong>
+                <span>Scroll, react, and discover from one screen.</span>
+              </div>
+              <div>
+                <strong>Class Pulse</strong>
+                <span>Leaderboards and superlatives auto-updated.</span>
+              </div>
+              <div>
+                <strong>Bookmarks</strong>
+                <span>Pin people and write your own private notes.</span>
+              </div>
+            </div>
+          </div>
 
-          <div className="home-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => navigate('/directory')}
-            >
-              Open directory
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/profile/edit')}
-            >
-              Update my profile
-            </button>
+          <div className="landing-visual-grid">
+            {HERO_IMAGES.map((imageUrl, index) => (
+              <article key={imageUrl} className={`landing-shot shot-${index + 1}`}>
+                <img src={imageUrl} alt="Students on campus" loading="lazy" />
+              </article>
+            ))}
           </div>
         </section>
 
-        <section className="panel home-metrics">
-          <div className="metric-card">
-            <p className="metric-label">Batch</p>
-            <p className="metric-value">{batchLabel}</p>
-          </div>
-          <div className="metric-card">
-            <p className="metric-label">Profile status</p>
-            <p className="metric-value">{frozen ? 'Frozen' : 'Active'}</p>
-          </div>
-          <div className="metric-card">
-            <p className="metric-label">Freeze date</p>
-            <p className="metric-value">{freezeDateLabel}</p>
-          </div>
-          {frozen && (
-            <p className="inline-notice info">
-              Your batch is frozen. Viewing is still available, but new interactions
-              and profile edits are disabled.
-            </p>
-          )}
+        <section className="landing-flow-grid">
+          <article className="panel flow-card">
+            <p className="eyebrow">Step 1</p>
+            <h3>Join your batch</h3>
+            <p>Log in, choose your institution, and get matched with your graduating crew.</p>
+          </article>
+          <article className="panel flow-card">
+            <p className="eyebrow">Step 2</p>
+            <h3>Enter the hub</h3>
+            <p>Discover cards, vote for superlatives, and react without changing pages.</p>
+          </article>
+          <article className="panel flow-card">
+            <p className="eyebrow">Step 3</p>
+            <h3>Keep your archive</h3>
+            <p>Save bookmarks, personal notes, and class momentum in one memory lane.</p>
+          </article>
         </section>
       </main>
     </div>

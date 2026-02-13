@@ -10,6 +10,11 @@ import institutionRoutes from './routes/institutions.js';
 import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import superlativeRoutes from './routes/superlatives.js';
+import memoryRoutes from './routes/memories.js';
+import {
+  ensureDefaultSuperlatives,
+  enforceSingleProfileReaction,
+} from './services/bootstrapService.js';
 
 const app = express();
 
@@ -53,11 +58,18 @@ app.use('/api/v1/institutions', institutionRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/batches', batchRoutes);
 app.use('/api/v1/superlatives', superlativeRoutes);
+app.use('/api/v1/memories', memoryRoutes);
 
 async function start() {
   try {
     await mongoose.connect(env.mongoUri);
     console.log('Connected to MongoDB');
+    await ensureDefaultSuperlatives();
+    console.log('Default superlatives ensured');
+    const cleanedLikes = await enforceSingleProfileReaction();
+    if (cleanedLikes > 0) {
+      console.log(`Removed ${cleanedLikes} duplicate profile reactions`);
+    }
 
     app.listen(env.port, () => {
       console.log(`Yearbook API listening on port ${env.port}`);
@@ -69,4 +81,3 @@ async function start() {
 }
 
 start();
-
