@@ -625,6 +625,66 @@ body {
   }
 }
 
+@media (max-width: 560px) {
+  .portfolio-page {
+    padding: 0.55rem;
+  }
+
+  .portfolio-main {
+    gap: 0.75rem;
+    padding-top: 0.8rem;
+    padding-bottom: 2rem;
+  }
+
+  .portfolio-nav {
+    padding: 0.65rem;
+    gap: 0.6rem;
+  }
+
+  .nav-links {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 0.2rem;
+  }
+
+  .nav-links a {
+    white-space: nowrap;
+    font-size: 0.84rem;
+    padding: 0.34rem 0.56rem;
+  }
+
+  .portfolio-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .yearbook-button,
+  .resume-button {
+    text-align: center;
+    font-size: 0.84rem;
+    padding: 0.42rem 0.62rem;
+  }
+
+  .hero-section,
+  .section,
+  .contact-section {
+    border-radius: 16px;
+    padding: 0.82rem;
+  }
+
+  .timeline-item,
+  .project-card,
+  .skills-grid article,
+  .stacked-cards article,
+  .achievement-list li,
+  .highlight-list article,
+  .identity-card {
+    padding: 0.72rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal-up,
   .delay-1,
