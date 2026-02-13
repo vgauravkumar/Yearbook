@@ -118,7 +118,6 @@ export function OnboardingPage() {
                         padding: '10px 12px',
                         cursor: 'pointer',
                         borderBottom: '1px solid #333',
-                        hover: { backgroundColor: '#2a2a2a' },
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#2a2a2a';
