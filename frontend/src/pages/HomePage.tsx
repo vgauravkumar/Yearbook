@@ -1,69 +1,147 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { getApiErrorMessage } from '../utils/errors';
+import { formatBatchLabel, formatFreezeDate, isBatchFrozen, type BatchInfo } from '../utils/yearbook';
 
 type MeResponse = {
+  id: string;
   full_name: string;
   email: string;
   has_completed_onboarding: boolean;
+  batch: BatchInfo | null;
 };
 
 export function HomePage() {
+  const navigate = useNavigate();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
+    async function loadCurrentUser() {
       try {
-        const res = await api.get('/api/v1/users/me');
-        const data = res.data;
-        setMe(data);
-        if (!data.has_completed_onboarding) {
+        const response = await api.get('/api/v1/users/me');
+        const user: MeResponse = response.data;
+        setMe(user);
+
+        if (!user.has_completed_onboarding) {
           navigate('/onboarding');
-          return;
         }
-      } catch {
-        // Not logged in
+      } catch (errorValue: unknown) {
+        setError(getApiErrorMessage(errorValue, 'Unable to load your account'));
       } finally {
         setLoading(false);
       }
     }
-    load();
-  }, []);
+
+    loadCurrentUser();
+  }, [navigate]);
+
+  const batchLabel = useMemo(() => formatBatchLabel(me?.batch ?? null), [me?.batch]);
+  const frozen = useMemo(() => isBatchFrozen(me?.batch ?? null), [me?.batch]);
+  const freezeDateLabel = useMemo(() => formatFreezeDate(me?.batch ?? null), [me?.batch]);
+
+  function handleLogout() {
+    localStorage.removeItem('access_token');
+    navigate('/auth');
+  }
 
   if (loading) {
-    return <p className="center">Loading...</p>;
+    return (
+      <div className="page-shell">
+        <div className="loading-screen">Loading your yearbook...</div>
+      </div>
+    );
   }
 
   if (!me) {
     return (
-      <div className="center">
-        <p>You are not logged in.</p>
-        <Link to="/auth">Go to login/signup</Link>
+      <div className="page-shell">
+        <section className="panel unauth-shell">
+          <h1>Welcome to Yearbook</h1>
+          <p>{error ?? 'You need to log in to open your batch.'}</p>
+          <Link className="btn btn-primary" to="/auth">
+            Go to login
+          </Link>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="home">
-      <header className="top-bar">
-        <h1>Yearbook</h1>
-        <div className="user-pill">{me.full_name}</div>
-      </header>
-      <main>
-        <h2>Welcome to your Yearbook</h2>
-        <p>Jump into your batch directory to see everyone.</p>
-        <div className="primary-actions">
-          <button onClick={() => navigate('/directory')}>
-            Open Directory
+    <div className="page-shell home-page">
+      <header className="top-nav">
+        <div className="brand-wrap">
+          <span className="brand-mark">YB</span>
+          <div>
+            <p className="eyebrow">Digital Yearbook</p>
+            <h1>Home</h1>
+          </div>
+        </div>
+
+        <div className="nav-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => navigate('/profile/edit')}
+          >
+            Edit profile
           </button>
-          <button onClick={() => navigate('/profile/edit')}>
-            Edit My Profile
+          <button type="button" className="btn btn-danger" onClick={handleLogout}>
+            Logout
           </button>
         </div>
+      </header>
+
+      <main className="home-grid">
+        <section className="panel hero-panel">
+          <p className="eyebrow">Hey {me.full_name.split(' ')[0]}</p>
+          <h2>Your class memories, all in one timeline.</h2>
+          <p>
+            Browse your classmates, react to profiles, and keep the yearbook alive
+            until your batch freeze date.
+          </p>
+
+          <div className="home-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate('/directory')}
+            >
+              Open directory
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate('/profile/edit')}
+            >
+              Update my profile
+            </button>
+          </div>
+        </section>
+
+        <section className="panel home-metrics">
+          <div className="metric-card">
+            <p className="metric-label">Batch</p>
+            <p className="metric-value">{batchLabel}</p>
+          </div>
+          <div className="metric-card">
+            <p className="metric-label">Profile status</p>
+            <p className="metric-value">{frozen ? 'Frozen' : 'Active'}</p>
+          </div>
+          <div className="metric-card">
+            <p className="metric-label">Freeze date</p>
+            <p className="metric-value">{freezeDateLabel}</p>
+          </div>
+          {frozen && (
+            <p className="inline-notice info">
+              Your batch is frozen. Viewing is still available, but new interactions
+              and profile edits are disabled.
+            </p>
+          )}
+        </section>
       </main>
     </div>
   );
 }
-

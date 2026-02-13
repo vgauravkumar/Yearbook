@@ -1,18 +1,19 @@
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { getApiErrorMessage } from '../utils/errors';
+import { MONTH_NAMES } from '../utils/yearbook';
 
-type Institution = { id: string; name: string };
-
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
+type Institution = {
+  id: string;
+  name: string;
+};
 
 export function OnboardingPage() {
+  const navigate = useNavigate();
+
   const [allInstitutions, setAllInstitutions] = useState<Institution[]>([]);
-  const [filteredInstitutions, setFilteredInstitutions] = useState<Institution[]>([]);
   const [search, setSearch] = useState('');
   const [selectedInstitutionId, setSelectedInstitutionId] = useState('');
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -20,174 +21,186 @@ export function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const navigate = useNavigate();
 
-  // Load all institutions on component mount
+  const autocompleteRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     async function loadAllInstitutions() {
       try {
-        const res = await api.get('/api/v1/institutions');
-        setAllInstitutions(res.data.institutions ?? []);
+        const response = await api.get('/api/v1/institutions');
+        setAllInstitutions(response.data.institutions ?? []);
       } catch {
-        // ignore
+        setAllInstitutions([]);
       }
     }
+
     loadAllInstitutions();
   }, []);
 
-  // Filter institutions based on search input
   useEffect(() => {
-    if (!search) {
-      setFilteredInstitutions(allInstitutions);
+    function closeWhenClickingOutside(event: MouseEvent) {
+      const target = event.target;
+      if (!target || !(target instanceof Node)) return;
+      if (!autocompleteRef.current?.contains(target)) {
+        setShowDropdown(false);
+      }
+    }
+
+    window.addEventListener('mousedown', closeWhenClickingOutside);
+    return () => window.removeEventListener('mousedown', closeWhenClickingOutside);
+  }, []);
+
+  const selectedInstitution = allInstitutions.find(
+    (institution) => institution.id === selectedInstitutionId,
+  );
+
+  const institutionInputValue = selectedInstitution ? selectedInstitution.name : search;
+
+  const filteredInstitutions = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    const source = normalized
+      ? allInstitutions.filter((institution) =>
+          institution.name.toLowerCase().includes(normalized),
+        )
+      : allInstitutions;
+
+    return source.slice(0, 50);
+  }, [allInstitutions, search]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const institutionName = search.trim();
+    if (!selectedInstitutionId && !institutionName) {
+      setError('Choose an institution or enter a custom institution name.');
+      setLoading(false);
       return;
     }
 
-    const filtered = allInstitutions.filter((inst) =>
-      inst.name.toLowerCase().includes(search.toLowerCase())
-    );
-    setFilteredInstitutions(filtered);
-  }, [search, allInstitutions]);
+    if (year < 2000 || year > 2050) {
+      setError('Graduation year must be between 2000 and 2050.');
+      setLoading(false);
+      return;
+    }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
     try {
       await api.post('/api/v1/users/onboard', {
         institution_id: selectedInstitutionId || undefined,
-        institution_name: search,
+        institution_name: selectedInstitutionId ? undefined : institutionName,
         graduation_year: year,
         graduation_month: month,
       });
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? 'Something went wrong');
+    } catch (errorValue: unknown) {
+      setError(getApiErrorMessage(errorValue, 'Something went wrong'));
     } finally {
       setLoading(false);
     }
   }
 
-  const selectedInstitution = allInstitutions.find(
-    (inst) => inst.id === selectedInstitutionId
-  );
-
   return (
-    <div className="auth-container">
-      <h1>Yearbook Onboarding</h1>
-      <div className="auth-card">
-        <form onSubmit={handleSubmit}>
-          <div className="field">
-            <label>Institution</label>
-            <div style={{ position: 'relative' }}>
+    <div className="page-shell onboarding-page">
+      <section className="panel onboarding-shell">
+        <header className="page-heading">
+          <p className="eyebrow">Onboarding</p>
+          <h1>Set your graduation batch</h1>
+          <p>
+            You will be grouped with students from the same institution and
+            graduation month.
+          </p>
+        </header>
+
+        <form onSubmit={handleSubmit} className="stack-form">
+          <div className="autocomplete" ref={autocompleteRef}>
+            <label className="field">
+              <span>Institution</span>
               <input
-                value={selectedInstitution ? selectedInstitution.name : search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setSelectedInstitutionId('');
-                }}
+                value={institutionInputValue}
                 onFocus={() => setShowDropdown(true)}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                placeholder="Click to see universities..."
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setSelectedInstitutionId('');
+                  setShowDropdown(true);
+                }}
+                placeholder="Search your school or type a new name"
                 autoComplete="off"
+                required={!selectedInstitutionId}
               />
-              {showDropdown && allInstitutions.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    backgroundColor: '#1a1a1a',
-                    border: '1px solid #444',
-                    borderRadius: '4px',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    zIndex: 1000,
-                  }}
-                >
-                  {filteredInstitutions.map((inst) => (
-                    <div
-                      key={inst.id}
+            </label>
+
+            {showDropdown && (
+              <div className="autocomplete-list" role="listbox">
+                {filteredInstitutions.length > 0 ? (
+                  filteredInstitutions.map((institution) => (
+                    <button
+                      key={institution.id}
+                      type="button"
+                      className="autocomplete-item"
                       onClick={() => {
-                        setSelectedInstitutionId(inst.id);
-                        setSearch(inst.name);
+                        setSelectedInstitutionId(institution.id);
+                        setSearch(institution.name);
                         setShowDropdown(false);
                       }}
-                      style={{
-                        padding: '10px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #333',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2a2a2a';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
                     >
-                      {inst.name}
-                    </div>
-                  ))}
-                  <div
-                    onClick={() => {
-                      setSelectedInstitutionId('');
-                      setShowDropdown(false);
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      cursor: 'pointer',
-                      fontStyle: 'italic',
-                      color: '#999',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#2a2a2a';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    Other (Enter manually)
-                  </div>
-                </div>
-              )}
-            </div>
-            {selectedInstitutionId === '' && search && (
-              <p style={{ fontSize: '0.9em', color: '#666', marginTop: '4px' }}>
-                Enter your university name or select from the list
-              </p>
+                      {institution.name}
+                    </button>
+                  ))
+                ) : (
+                  <p className="autocomplete-empty">No exact match. Use custom name below.</p>
+                )}
+
+                <button
+                  type="button"
+                  className="autocomplete-item custom"
+                  onClick={() => {
+                    setSelectedInstitutionId('');
+                    setShowDropdown(false);
+                  }}
+                >
+                  Use custom institution name
+                </button>
+              </div>
             )}
           </div>
-          <div className="field">
-            <label>Graduation year</label>
-            <input
-              type="number"
-              value={year}
-              min={2000}
-              max={2050}
-              onChange={(e) => setYear(Number(e.target.value))}
-            />
+
+          <div className="field-grid">
+            <label className="field">
+              <span>Graduation year</span>
+              <input
+                type="number"
+                value={year}
+                min={2000}
+                max={2050}
+                onChange={(event) => setYear(Number(event.target.value))}
+              />
+            </label>
+
+            <label className="field">
+              <span>Graduation month</span>
+              <select
+                value={month}
+                onChange={(event) => setMonth(Number(event.target.value))}
+              >
+                {MONTH_NAMES.map((monthName, index) => (
+                  <option key={monthName} value={index + 1}>
+                    {monthName}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <div className="field">
-            <label>Graduation month</label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-            >
-              {MONTHS.map((monthName, index) => (
-                <option key={index} value={index + 1}>
-                  {monthName}
-                </option>
-              ))}
-            </select>
+
+          {error && <p className="inline-notice error">{error}</p>}
+
+          <div className="form-actions">
+            <button type="submit" disabled={loading} className="btn btn-primary btn-block">
+              {loading ? 'Saving your batch...' : 'Enter yearbook'}
+            </button>
           </div>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading}>
-            {loading ? 'Saving...' : 'Continue'}
-          </button>
         </form>
-      </div>
+      </section>
     </div>
   );
 }
-
