@@ -252,7 +252,7 @@ export function ProfileEditPage() {
 
   function handleLogout() {
     localStorage.removeItem('access_token');
-    navigate('/auth');
+    navigate('/', { replace: true });
   }
 
   if (!me && !error) {

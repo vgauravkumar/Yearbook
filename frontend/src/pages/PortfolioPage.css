@@ -128,13 +128,14 @@ body {
 
 .resume-button {
   text-decoration: none;
-  color: var(--ink);
-  border: 1px solid var(--line);
+  color: #fff;
+  border: 1px solid rgba(201, 89, 36, 0.85);
   border-radius: 999px;
   padding: 0.45rem 0.95rem;
   font-weight: 600;
   font-size: 0.88rem;
-  background: var(--surface-strong);
+  background: linear-gradient(140deg, #ff8a52, #ff5f7a);
+  box-shadow: 0 10px 20px rgba(201, 89, 36, 0.28);
 }
 
 .portfolio-actions {
@@ -145,13 +146,19 @@ body {
 
 .yearbook-button {
   text-decoration: none;
-  color: var(--ink-soft);
-  border: 1px solid var(--line);
+  color: #fff;
+  border: 1px solid rgba(201, 89, 36, 0.85);
   border-radius: 999px;
   padding: 0.45rem 0.95rem;
   font-weight: 600;
   font-size: 0.88rem;
-  background: rgba(255, 255, 255, 0.56);
+  background: linear-gradient(140deg, #ff8a52, #ff5f7a);
+  box-shadow: 0 10px 20px rgba(201, 89, 36, 0.28);
+}
+
+.resume-button:hover,
+.yearbook-button:hover {
+  background: linear-gradient(140deg, #f1783f, #f25668);
 }
 
 .portfolio-main {

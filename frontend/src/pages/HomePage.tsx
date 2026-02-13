@@ -136,7 +136,7 @@ export function HomePage() {
           <p className="eyebrow">Built with intent</p>
           <h3>Want to know the developer behind this product?</h3>
           <p>Explore the full profile, experience timeline, and projects.</p>
-          <Link className="btn btn-secondary" to="/resume">
+          <Link className="btn btn-primary" to="/resume">
             Know about the developer
           </Link>
         </section>

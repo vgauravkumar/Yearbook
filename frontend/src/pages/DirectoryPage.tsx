@@ -57,6 +57,7 @@ type SuperlativeLeaderboard = {
 type MeResponse = {
   id: string;
   full_name: string;
+  profile_picture_url?: string;
   batch: (BatchInfo & { id: string }) | null;
 };
 
@@ -201,6 +202,7 @@ export function DirectoryPage() {
 
   const [viewerId, setViewerId] = useState('');
   const [viewerName, setViewerName] = useState('');
+  const [viewerProfilePictureUrl, setViewerProfilePictureUrl] = useState('');
   const [batch, setBatch] = useState<BatchInfo | null>(null);
   const [students, setStudents] = useState<StudentTile[]>([]);
   const [superlatives, setSuperlatives] = useState<SuperlativeDefinition[]>([]);
@@ -214,7 +216,6 @@ export function DirectoryPage() {
   const [memoryFeedLoading, setMemoryFeedLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('trending');
   const [activeTab, setActiveTab] = useState<HubTab>('discover');
   const [flippedStudentId, setFlippedStudentId] = useState<string | null>(null);
@@ -264,6 +265,7 @@ export function DirectoryPage() {
 
         setViewerId(me.id);
         setViewerName(me.full_name);
+        setViewerProfilePictureUrl(me.profile_picture_url ?? '');
         setBatch(me.batch);
 
         const [studentResponse, superlativeResponse] = await Promise.all([
@@ -347,19 +349,8 @@ export function DirectoryPage() {
   const batchLabel = useMemo(() => formatBatchLabel(batch), [batch]);
   const freezeDateLabel = useMemo(() => formatFreezeDate(batch), [batch]);
 
-  const filteredStudents = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return students;
-
-    return students.filter((student) => {
-      const inName = student.full_name.toLowerCase().includes(query);
-      const inBio = student.bio?.toLowerCase().includes(query) ?? false;
-      return inName || inBio;
-    });
-  }, [search, students]);
-
   const sortedStudents = useMemo(() => {
-    const list = [...filteredStudents];
+    const list = [...students];
 
     if (sortMode === 'alphabetical') {
       list.sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -378,7 +369,7 @@ export function DirectoryPage() {
 
     list.sort((a, b) => getTrendingScore(b) - getTrendingScore(a));
     return list;
-  }, [filteredStudents, sortMode]);
+  }, [students, sortMode]);
 
   const spotlightStudent = useMemo(
     () => sortedStudents.find((student) => student.id === spotlightId) ?? null,
@@ -456,6 +447,19 @@ export function DirectoryPage() {
   const displayedLeaderboards =
     superlativeLeaderboards.length > 0 ? superlativeLeaderboards : fallbackSuperlativeLeaders;
 
+  const topSuperlativeHighlights = useMemo(
+    () =>
+      [...displayedLeaderboards]
+        .filter((entry) => entry.leaders.length > 0)
+        .sort((a, b) => {
+          const topVotesA = a.leaders[0]?.vote_count ?? 0;
+          const topVotesB = b.leaders[0]?.vote_count ?? 0;
+          return topVotesB - topVotesA;
+        })
+        .slice(0, 3),
+    [displayedLeaderboards],
+  );
+
   const totalRemainingVotes = useMemo(
     () => superlativeStatuses.reduce((sum, status) => sum + status.remaining_votes, 0),
     [superlativeStatuses],
@@ -480,7 +484,7 @@ export function DirectoryPage() {
 
   function handleLogout() {
     localStorage.removeItem('access_token');
-    navigate('/auth', { replace: true });
+    navigate('/', { replace: true });
   }
 
   function togglePin(studentId: string) {
@@ -1002,63 +1006,78 @@ export function DirectoryPage() {
         </div>
 
         <div className="nav-actions">
-          <span className="user-chip">{viewerName}</span>
           <button
             type="button"
-            className="btn btn-secondary"
+            className="user-chip user-chip-button"
             onClick={() => navigate('/profile/edit')}
+            aria-label="Edit profile"
           >
-            Edit profile
+            <span className="user-chip-avatar" aria-hidden="true">
+              {viewerProfilePictureUrl ? (
+                <img src={viewerProfilePictureUrl} alt="" />
+              ) : (
+                viewerName.trim().charAt(0).toUpperCase()
+              )}
+            </span>
+            <span>{viewerName}</span>
           </button>
-          <button type="button" className="btn btn-danger" onClick={handleLogout}>
-            Logout
+          <button
+            type="button"
+            className="btn btn-danger btn-icon"
+            onClick={handleLogout}
+            aria-label="Logout"
+          >
+            <span aria-hidden="true">⎋</span>
+            <span className="sr-only">Logout</span>
           </button>
         </div>
       </header>
 
       <main className="hub-shell">
         <section className="panel hub-toolbar">
-          <div className="hub-tab-row" role="tablist" aria-label="Hub sections">
-            <button
-              type="button"
-              className={`hub-tab ${activeTab === 'discover' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('discover')}
-            >
-              Discover
-            </button>
-            <button
-              type="button"
-              className={`hub-tab ${activeTab === 'pulse' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('pulse')}
-            >
-              Pulse
-            </button>
-            <button
-              type="button"
-              className={`hub-tab ${activeTab === 'memories' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('memories')}
-            >
-              Memories
-            </button>
-            <button
-              type="button"
-              className={`hub-tab ${activeTab === 'bookmarks' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('bookmarks')}
-            >
-              Bookmarks
-            </button>
+          <div className="hub-toolbar-top">
+            <div className="hub-tab-row" role="tablist" aria-label="Hub sections">
+              <button
+                type="button"
+                className={`hub-tab ${activeTab === 'discover' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('discover')}
+              >
+                Discover
+              </button>
+              <button
+                type="button"
+                className={`hub-tab ${activeTab === 'pulse' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('pulse')}
+              >
+                Pulse
+              </button>
+              <button
+                type="button"
+                className={`hub-tab ${activeTab === 'memories' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('memories')}
+              >
+                Memories
+              </button>
+              <button
+                type="button"
+                className={`hub-tab ${activeTab === 'bookmarks' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('bookmarks')}
+              >
+                Bookmarks
+              </button>
+            </div>
+
+            <div className="toolbar-meta">
+              <span className="pill">{students.length} students</span>
+              <span className="pill">{pinnedStudents.length} pinned</span>
+              <span className="pill">{totalRemainingVotes} votes left</span>
+              <span className={`pill ${frozen ? 'frozen' : 'active'}`}>
+                {frozen ? `Frozen on ${freezeDateLabel}` : 'Batch open'}
+              </span>
+            </div>
           </div>
 
           <div className="hub-toolbar-grid">
-            <label className="field search-field">
-              <span>Search classmates</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Type a name, vibe, or bio"
-              />
-            </label>
-
             <label className="field">
               <span>Sort by</span>
               <select
@@ -1072,32 +1091,12 @@ export function DirectoryPage() {
             </label>
 
             <div className="hub-toolbar-actions">
-              <button type="button" className="btn btn-secondary" onClick={shuffleSpotlight}>
+              <button type="button" className="btn btn-primary" onClick={shuffleSpotlight}>
                 Surprise me
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  if (spotlightStudent) {
-                    navigate(`/profile/${spotlightStudent.id}`);
-                  }
-                }}
-                disabled={!spotlightStudent}
-              >
-                Open spotlight
               </button>
             </div>
           </div>
 
-          <div className="toolbar-meta">
-            <span className="pill">{students.length} students</span>
-            <span className="pill">{pinnedStudents.length} pinned</span>
-            <span className="pill">{totalRemainingVotes} votes left</span>
-            <span className={`pill ${frozen ? 'frozen' : 'active'}`}>
-              {frozen ? `Frozen on ${freezeDateLabel}` : 'Batch open'}
-            </span>
-          </div>
         </section>
 
         {notice && <p className={`inline-notice ${notice.tone}`}>{notice.message}</p>}
@@ -1142,21 +1141,21 @@ export function DirectoryPage() {
             )}
 
             <article className="panel vote-budget-panel">
-              <h3>Your superlative votes</h3>
-              {superlativeStatuses.length > 0 ? (
+              <h3>Top voted in superlatives</h3>
+              {topSuperlativeHighlights.length > 0 ? (
                 <div className="vote-budget-grid">
-                  {superlativeStatuses.map((status) => (
-                    <div key={`budget-${status.id}`} className="vote-budget-card">
-                      <p>{status.name}</p>
-                      <strong>{status.remaining_votes} left</strong>
+                  {topSuperlativeHighlights.map((entry) => (
+                    <div key={`highlight-${entry.id}`} className="vote-budget-card">
+                      <p>{entry.name}</p>
+                      <strong>{entry.leaders[0].full_name}</strong>
                       <span>
-                        {status.votes_used}/{status.max_votes} used
+                        {entry.leaders[0].vote_count} votes
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="muted">Superlatives will appear once categories are loaded.</p>
+                <p className="muted">Top winners will appear once votes are recorded.</p>
               )}
             </article>
 
@@ -1182,8 +1181,10 @@ export function DirectoryPage() {
                             type="button"
                             className={`pin-toggle ${isPinned ? 'is-pinned' : ''}`}
                             onClick={() => togglePin(student.id)}
+                            aria-label={isPinned ? 'Unpin profile' : 'Pin profile'}
                           >
-                            {isPinned ? 'Pinned' : 'Pin'}
+                            <span aria-hidden="true">{isPinned ? '📌' : '📍'}</span>
+                            <span className="sr-only">{isPinned ? 'Pinned' : 'Pin'}</span>
                           </button>
 
                           <button
