@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -27,6 +28,7 @@ type Profile = {
 export function ProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const navigate = useNavigate();
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function ProfilePage() {
         <button
           type="button"
           className="back-button"
-          onClick={() => (window.location.href = '/directory')}
+          onClick={() => navigate('/directory')}
         >
           ← Back
         </button>

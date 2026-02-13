@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 type Institution = { id: string; name: string };
@@ -12,6 +13,7 @@ export function OnboardingPage() {
   const [month, setMonth] = useState<number>(6);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function searchInstitutions() {
@@ -43,7 +45,7 @@ export function OnboardingPage() {
         graduation_year: year,
         graduation_month: month,
       });
-      window.location.href = '/';
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Something went wrong');
     } finally {

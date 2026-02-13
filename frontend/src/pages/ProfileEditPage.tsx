@@ -1,5 +1,6 @@
 import type { FormEvent, ChangeEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 type MeResponse = {
@@ -24,6 +25,7 @@ export function ProfileEditPage() {
   const [fieldErrors, setFieldErrors] = useState<{ instagram?: string; linkedin?: string }>(
     {},
   );
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
@@ -108,7 +110,7 @@ export function ProfileEditPage() {
         });
       }
 
-      window.location.href = '/';
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Failed to update profile');
     } finally {
@@ -132,8 +134,8 @@ export function ProfileEditPage() {
           type="button"
           className="back-button"
           onClick={() => {
-            window.location.href = '/';
-          }}
+              navigate('/');
+            }}
         >
           ← Back
         </button>
@@ -141,9 +143,9 @@ export function ProfileEditPage() {
         <button
           type="button"
           onClick={() => {
-            localStorage.removeItem('access_token');
-            window.location.href = '/auth';
-          }}
+              localStorage.removeItem('access_token');
+              navigate('/auth');
+            }}
         >
           Logout
         </button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 type MeResponse = {
@@ -10,6 +11,7 @@ type MeResponse = {
 export function HomePage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
@@ -18,7 +20,7 @@ export function HomePage() {
         const data = res.data;
         setMe(data);
         if (!data.has_completed_onboarding) {
-          window.location.href = '/onboarding';
+          navigate('/onboarding');
           return;
         }
       } catch {
@@ -38,7 +40,7 @@ export function HomePage() {
     return (
       <div className="center">
         <p>You are not logged in.</p>
-        <a href="/auth">Go to login/signup</a>
+        <Link to="/auth">Go to login/signup</Link>
       </div>
     );
   }
@@ -53,10 +55,10 @@ export function HomePage() {
         <h2>Welcome to your Yearbook</h2>
         <p>Jump into your batch directory to see everyone.</p>
         <div className="primary-actions">
-          <button onClick={() => (window.location.href = '/directory')}>
+          <button onClick={() => navigate('/directory')}>
             Open Directory
           </button>
-          <button onClick={() => (window.location.href = '/profile/edit')}>
+          <button onClick={() => navigate('/profile/edit')}>
             Edit My Profile
           </button>
         </div>

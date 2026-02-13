@@ -1,10 +1,12 @@
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 type Mode = 'login' | 'register';
 
 export function AuthPage() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('register');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -27,7 +29,7 @@ export function AuthPage() {
       } else {
         const res = await api.post('/api/v1/auth/login', { email, password });
         localStorage.setItem('access_token', res.data.access_token);
-        window.location.href = '/';
+        navigate('/');
       }
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Something went wrong');

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 
 type StudentTile = {
@@ -17,6 +18,7 @@ export function DirectoryPage() {
   const [students, setStudents] = useState<StudentTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
@@ -24,7 +26,7 @@ export function DirectoryPage() {
         const me = await api.get('/api/v1/users/me');
         const batch: MeBatch | null = me.data.batch;
         if (!batch) {
-          window.location.href = '/onboarding';
+          navigate('/onboarding');
           return;
         }
         const res = await api.get(`/api/v1/batches/${batch.id}/students`, {
@@ -49,7 +51,7 @@ export function DirectoryPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() => (window.location.href = '/')}
+          onClick={() => navigate('/')}
         >
           ← Back
         </button>
@@ -59,11 +61,11 @@ export function DirectoryPage() {
         <h2>Your Batchmates</h2>
         <div className="grid">
           {students.map((s) => (
-            <button
-              key={s.id}
-              className="tile"
-              onClick={() => (window.location.href = `/profile/${s.id}`)}
-            >
+                <button
+                  key={s.id}
+                  className="tile"
+                  onClick={() => navigate(`/profile/${s.id}`)}
+                >
               <div className="avatar">
                 {s.profile_picture_url ? (
                   <img src={s.profile_picture_url} alt={s.full_name} />
