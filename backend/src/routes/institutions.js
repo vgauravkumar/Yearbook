@@ -3,6 +3,25 @@ import { Institution } from '../models/Institution.js';
 
 const router = express.Router();
 
+// GET /api/v1/institutions - Get all institutions
+router.get('/', async (req, res) => {
+  try {
+    const institutions = await Institution.find({}, { name: 1 })
+      .sort({ name: 1 })
+      .lean();
+
+    return res.json({
+      institutions: institutions.map((inst) => ({
+        id: inst._id,
+        name: inst.name,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/v1/institutions/search?query=...
 router.get('/search', async (req, res) => {
   try {

@@ -6,6 +6,7 @@ type StudentTile = {
   id: string;
   full_name: string;
   profile_picture_url?: string;
+  bio?: string;
   like_count: number;
   superlike_count: number;
 };
@@ -74,6 +75,7 @@ export function DirectoryPage() {
                 )}
               </div>
               <div className="tile-name">{s.full_name}</div>
+              {s.bio && <div className="tile-bio">{s.bio}</div>}
               <div className="tile-counts">
                 <span>❤️ {s.like_count}</span>
                 <span>🌟 {s.superlike_count}</span>

@@ -23,7 +23,7 @@ router.get('/:batchId/students', async (req, res) => {
 
     const users = await User.find(
       { _id: { $in: userIds } },
-      { fullName: 1, profilePictureUrl: 1 },
+      { fullName: 1, profilePictureUrl: 1, bio: 1 },
     ).lean();
 
     const likes = await Like.aggregate([
@@ -86,6 +86,7 @@ router.get('/:batchId/students', async (req, res) => {
         id,
         full_name: u.fullName,
         profile_picture_url: u.profilePictureUrl,
+        bio: u.bio,
         like_count: likeMap.get(id) ?? 0,
         superlike_count: superlikeMap.get(id) ?? 0,
         superlatives: slist,
