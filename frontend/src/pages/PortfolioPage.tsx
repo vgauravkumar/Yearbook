@@ -50,8 +50,15 @@ function PortfolioPage() {
           <a className="yearbook-button" href="/">
             Yearbook
           </a>
-          <a className="resume-button" href={`mailto:${personal.email}`}>
-            Hire me
+          <a
+            className="resume-button"
+            href="/Gaurav%20Kumar%20Verma.pdf"
+            download="Gaurav-Kumar-Verma-Resume.pdf"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />
+            </svg>
+            <span>Resume</span>
           </a>
         </div>
       </header>

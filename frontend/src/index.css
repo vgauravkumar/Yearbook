@@ -1309,6 +1309,16 @@ button {
   color: #a4552a;
 }
 
+.landing-dev-cta .btn-primary {
+  border-color: rgba(53, 132, 74, 0.85);
+  background: linear-gradient(140deg, #3cb17d, #228f65);
+  box-shadow: 0 10px 22px rgba(34, 143, 101, 0.28);
+}
+
+.landing-dev-cta .btn-primary:hover {
+  background: linear-gradient(140deg, #349f70, #1f815b);
+}
+
 .hub-page {
   gap: 0.88rem;
 }

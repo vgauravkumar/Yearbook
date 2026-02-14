@@ -136,6 +136,15 @@ body {
   font-size: 0.88rem;
   background: linear-gradient(140deg, #ff8a52, #ff5f7a);
   box-shadow: 0 10px 20px rgba(201, 89, 36, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.resume-button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentColor;
 }
 
 .portfolio-actions {

@@ -165,18 +165,18 @@ export const portfolioData: PortfolioData = {
   ],
   projects: [
     {
-      name: 'BookNabe API (Book Exchange App)',
-      period: 'Open-source project',
+      name: 'BookNabe (Book Exchange App)',
+      period: 'Freelance project',
       stack: ['NodeJS', 'ExpressJS', 'Flutter', 'MongoDB', 'Mongoose', 'OAuth', 'Firebase', 'Sockets'],
       summary:
-        'Developed a RESTful API for the BookNabe Flutter app to help users exchange books locally.',
+        'Developed a backend and managed deployment for the BookNabe Flutter app to help users exchange books locally.',
       impact:
         'Implemented CRUD operations using NodeJS and MongoDB with Mongoose, and integrated OAuth, Firebase, and socket-based notifications for a richer user experience.',
       links: [],
     },
     {
       name: 'Blockchain Chess Betting Platform',
-      period: 'Open-source project',
+      period: 'Freelance project',
       stack: ['Solidity', 'Angular', 'NodeJS', 'Heroku', 'Matic'],
       summary:
         'Built a blockchain-based chess betting platform on Matic, enabling users to place secure and transparent wagers on live games.',
@@ -260,7 +260,7 @@ export const portfolioData: PortfolioData = {
       year: 'Leadership Role',
     },
     {
-      name: 'Coordinator',
+      name: 'President',
       issuer: 'Kronicle Debating Society, KIIT University',
       year: 'Leadership Role',
     },
