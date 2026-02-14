@@ -28,6 +28,7 @@ build/
 coverage/
 
 # OS / editor files
+dev.sh
 .DS_Store
 Thumbs.db
 .vscode/
