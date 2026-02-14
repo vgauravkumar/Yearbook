@@ -19,10 +19,19 @@ export const env = {
   frontendUrl: requireEnv('FRONTEND_URL'),
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
   rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-  cloudinary: {
-    cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
-    apiKey: requireEnv('CLOUDINARY_API_KEY'),
-    apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+  aws: {
+    region: requireEnv('AWS_REGION'),
+    accessKeyId: requireEnv('AWS_ACCESS_KEY_ID'),
+    secretAccessKey: requireEnv('AWS_SECRET_ACCESS_KEY'),
+    s3Bucket: requireEnv('AWS_S3_BUCKET'),
+  },
+  s3: {
+    presignedUploadExpiresSec: Number(
+      process.env.S3_PRESIGNED_UPLOAD_EXPIRES_SEC || '120',
+    ),
+    signedReadExpiresSec: Number(
+      process.env.S3_SIGNED_READ_EXPIRES_SEC || '900',
+    ),
   },
   email: {
     host: requireEnv('EMAIL_HOST'),
@@ -31,4 +40,3 @@ export const env = {
     pass: requireEnv('EMAIL_PASS'),
   },
 };
-

@@ -55,11 +55,7 @@ const UserSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
-    profilePictureUrl: {
-      type: String,
-      default: null,
-    },
-    cloudinaryPublicId: {
+    profilePictureKey: {
       type: String,
       default: null,
     },
@@ -93,4 +89,3 @@ UserSchema.index({ email: 1 });
 UserSchema.index({ fullName: 'text' });
 
 export const User = mongoose.model('User', UserSchema);
-

@@ -1,21 +1,27 @@
 import express from 'express';
 import { Filter } from 'bad-words';
-import multer from 'multer';
-import fs from 'fs/promises';
 
 import { authRequired } from '../middleware/auth.js';
 import { UserBatch } from '../models/UserBatch.js';
 import { Batch } from '../models/Batch.js';
 import { Memory } from '../models/Memory.js';
 import { MemoryReaction } from '../models/MemoryReaction.js';
-import { deleteImage, uploadMemoryMedia } from '../services/imageService.js';
+import {
+  MEMORY_MAX_BYTES,
+  getMemoryMediaType,
+  isAllowedMemoryMimeType,
+  normalizeMimeType,
+} from '../services/uploadPolicy.js';
+import {
+  deleteObject,
+  headObject,
+  isMemoryObjectKeyForUser,
+  isS3NotFoundError,
+} from '../services/imageService.js';
+import { signMediaUrl } from '../services/mediaUrlService.js';
 
 const router = express.Router();
 const profanityFilter = new Filter();
-const upload = multer({
-  dest: 'uploads/',
-  limits: { fileSize: 25 * 1024 * 1024 },
-});
 
 async function ensureNotFrozen(batchId) {
   const batch = await Batch.findById(batchId);
@@ -28,16 +34,25 @@ async function ensureNotFrozen(batchId) {
   return { frozen: isFrozen, batch };
 }
 
-function mapMemory(memory, likeCountMap, likedMemoryIds) {
+async function mapMemory(memory, likeCountMap, likedMemoryIds) {
   const id = memory._id.toString();
   const user = memory.userId;
+  const [mediaUrl, thumbnailUrl, profilePictureUrl] = await Promise.all([
+    signMediaUrl(memory.mediaKey),
+    signMediaUrl(memory.thumbnailKey),
+    signMediaUrl(user.profilePictureKey),
+  ]);
+
+  if (!mediaUrl) {
+    return null;
+  }
 
   return {
     id,
     caption: memory.caption,
-    media_url: memory.mediaUrl,
+    media_url: mediaUrl,
     media_type: memory.mediaType,
-    thumbnail_url: memory.thumbnailUrl,
+    thumbnail_url: thumbnailUrl,
     duration_sec: memory.durationSec,
     created_at: memory.createdAt,
     like_count: likeCountMap.get(id) ?? 0,
@@ -45,7 +60,7 @@ function mapMemory(memory, likeCountMap, likedMemoryIds) {
     user: {
       id: user._id,
       full_name: user.fullName,
-      profile_picture_url: user.profilePictureUrl,
+      profile_picture_url: profilePictureUrl,
     },
   };
 }
@@ -67,7 +82,7 @@ router.get('/feed', authRequired, async (req, res) => {
     const memories = await Memory.find({ batchId: userBatch.batchId })
       .sort({ createdAt: -1 })
       .limit(150)
-      .populate('userId', 'fullName profilePictureUrl')
+      .populate('userId', 'fullName profilePictureKey')
       .lean();
 
     const memoryIds = memories.map((memory) => memory._id);
@@ -98,9 +113,13 @@ router.get('/feed', authRequired, async (req, res) => {
       likedDocs.map((entry) => entry.memoryId.toString()),
     );
 
-    const mappedMemories = memories
-      .filter((memory) => Boolean(memory.userId))
-      .map((memory) => mapMemory(memory, likeCountMap, likedMemoryIds));
+    const mappedMemories = (
+      await Promise.all(
+        memories
+          .filter((memory) => Boolean(memory.userId))
+          .map((memory) => mapMemory(memory, likeCountMap, likedMemoryIds)),
+      )
+    ).filter((entry) => Boolean(entry));
 
     const reels = [...mappedMemories].sort((a, b) => {
       if (b.like_count !== a.like_count) {
@@ -163,8 +182,8 @@ router.get('/feed', authRequired, async (req, res) => {
 });
 
 // POST /api/v1/memories
-router.post('/', authRequired, upload.single('file'), async (req, res) => {
-  let uploadedPublicId = null;
+router.post('/', authRequired, async (req, res) => {
+  let uploadedObjectKey = null;
 
   try {
     const userBatch = await UserBatch.findOne({
@@ -184,6 +203,16 @@ router.post('/', authRequired, upload.single('file'), async (req, res) => {
       });
     }
 
+    const objectKey =
+      typeof req.body?.object_key === 'string' ? req.body.object_key.trim() : '';
+    if (!objectKey) {
+      return res.status(400).json({ error: 'object_key is required' });
+    }
+
+    if (!isMemoryObjectKeyForUser(objectKey, req.user._id.toString())) {
+      return res.status(400).json({ error: 'Invalid memory object key' });
+    }
+
     const caption = (req.body.caption ?? '').toString().trim();
     if (caption.length > 280) {
       return res.status(400).json({ error: 'Caption too long (max 280)' });
@@ -195,35 +224,57 @@ router.post('/', authRequired, upload.single('file'), async (req, res) => {
       });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'Media file is required' });
+    let objectMeta = null;
+    try {
+      objectMeta = await headObject({ key: objectKey });
+    } catch (err) {
+      if (isS3NotFoundError(err)) {
+        return res.status(400).json({ error: 'Uploaded file not found' });
+      }
+      throw err;
     }
 
-    const uploadResult = await uploadMemoryMedia(req.file.path, req.user._id);
-    uploadedPublicId = uploadResult.public_id;
+    const objectContentType = normalizeMimeType(objectMeta.contentType);
+    if (!isAllowedMemoryMimeType(objectContentType)) {
+      return res.status(400).json({ error: 'Unsupported memory file type' });
+    }
 
-    const mediaType = uploadResult.resource_type === 'video' ? 'video' : 'image';
+    if (
+      typeof objectMeta.contentLength === 'number' &&
+      objectMeta.contentLength > MEMORY_MAX_BYTES
+    ) {
+      return res.status(400).json({ error: 'Memory file must be smaller than 25MB.' });
+    }
+
+    uploadedObjectKey = objectKey;
+    const mediaType = getMemoryMediaType(objectContentType);
+    const thumbnailKey = mediaType === 'image' ? objectKey : null;
 
     const memory = await Memory.create({
       userId: req.user._id,
       batchId: userBatch.batchId,
-      mediaUrl: uploadResult.secure_url,
+      mediaKey: objectKey,
       mediaType,
-      cloudinaryPublicId: uploadResult.public_id,
-      thumbnailUrl: uploadResult.secure_url,
-      durationSec:
-        typeof uploadResult.duration === 'number'
-          ? Math.round(uploadResult.duration)
-          : null,
+      thumbnailKey,
+      durationSec: null,
       caption,
     });
+
+    const [mediaUrl, signedThumbnailUrl, profilePictureUrl] = await Promise.all([
+      signMediaUrl(memory.mediaKey),
+      signMediaUrl(memory.thumbnailKey),
+      signMediaUrl(req.user.profilePictureKey),
+    ]);
+    if (!mediaUrl) {
+      throw new Error('Unable to sign memory media URL');
+    }
 
     return res.status(201).json({
       id: memory._id,
       caption: memory.caption,
-      media_url: memory.mediaUrl,
+      media_url: mediaUrl,
       media_type: memory.mediaType,
-      thumbnail_url: memory.thumbnailUrl,
+      thumbnail_url: signedThumbnailUrl,
       duration_sec: memory.durationSec,
       created_at: memory.createdAt,
       like_count: 0,
@@ -231,20 +282,16 @@ router.post('/', authRequired, upload.single('file'), async (req, res) => {
       user: {
         id: req.user._id,
         full_name: req.user.fullName,
-        profile_picture_url: req.user.profilePictureUrl,
+        profile_picture_url: profilePictureUrl,
       },
     });
   } catch (err) {
-    if (uploadedPublicId) {
-      await deleteImage(uploadedPublicId).catch(() => {});
+    if (uploadedObjectKey) {
+      await deleteObject(uploadedObjectKey).catch(() => {});
     }
 
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    if (req.file?.path) {
-      await fs.unlink(req.file.path).catch(() => {});
-    }
   }
 });
 
@@ -326,8 +373,12 @@ router.delete('/:memoryId', authRequired, async (req, res) => {
     await MemoryReaction.deleteMany({ memoryId: memory._id });
     await memory.deleteOne();
 
-    if (memory.cloudinaryPublicId) {
-      await deleteImage(memory.cloudinaryPublicId).catch(() => {});
+    if (memory.mediaKey) {
+      await deleteObject(memory.mediaKey).catch(() => {});
+    }
+
+    if (memory.thumbnailKey && memory.thumbnailKey !== memory.mediaKey) {
+      await deleteObject(memory.thumbnailKey).catch(() => {});
     }
 
     return res.json({ message: 'Memory deleted' });

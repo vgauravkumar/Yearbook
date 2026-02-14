@@ -4,6 +4,7 @@ import { UserBatch } from '../models/UserBatch.js';
 import { Like } from '../models/Like.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
 import { Superlative } from '../models/Superlative.js';
+import { signMediaUrl } from '../services/mediaUrlService.js';
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.get('/:batchId/students', async (req, res) => {
 
     const users = await User.find(
       { _id: { $in: userIds } },
-      { fullName: 1, profilePictureUrl: 1, bio: 1 },
+      { fullName: 1, profilePictureKey: 1, bio: 1 },
     ).lean();
 
     const likes = await Like.aggregate([
@@ -98,30 +99,32 @@ router.get('/:batchId/students', async (req, res) => {
       superlatives.map((entry) => [entry._id.toString(), entry]),
     );
 
-    let students = users.map((user) => {
-      const id = user._id.toString();
-      const voteMap = votesByUser.get(id) ?? new Map();
-      const superlativeSummary = Array.from(voteMap.entries()).map(
-        ([superlativeId, count]) => {
-          const superlative = superlativeById.get(superlativeId);
-          return {
-            id: superlativeId,
-            name: superlative?.name ?? 'Unknown',
-            vote_count: count,
-          };
-        },
-      );
+    let students = await Promise.all(
+      users.map(async (user) => {
+        const id = user._id.toString();
+        const voteMap = votesByUser.get(id) ?? new Map();
+        const superlativeSummary = Array.from(voteMap.entries()).map(
+          ([superlativeId, count]) => {
+            const superlative = superlativeById.get(superlativeId);
+            return {
+              id: superlativeId,
+              name: superlative?.name ?? 'Unknown',
+              vote_count: count,
+            };
+          },
+        );
 
-      return {
-        id,
-        full_name: user.fullName,
-        profile_picture_url: user.profilePictureUrl,
-        bio: user.bio,
-        like_count: likeMap.get(id) ?? 0,
-        superlike_count: superlikeMap.get(id) ?? 0,
-        superlatives: superlativeSummary,
-      };
-    });
+        return {
+          id,
+          full_name: user.fullName,
+          profile_picture_url: await signMediaUrl(user.profilePictureKey),
+          bio: user.bio,
+          like_count: likeMap.get(id) ?? 0,
+          superlike_count: superlikeMap.get(id) ?? 0,
+          superlatives: superlativeSummary,
+        };
+      }),
+    );
 
     if (search) {
       students = students.filter((student) => {

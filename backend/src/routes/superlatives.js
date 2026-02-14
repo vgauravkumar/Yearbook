@@ -5,6 +5,7 @@ import { UserBatch } from '../models/UserBatch.js';
 import { Batch } from '../models/Batch.js';
 import { User } from '../models/User.js';
 import { authRequired } from '../middleware/auth.js';
+import { signMediaUrl } from '../services/mediaUrlService.js';
 
 const router = express.Router();
 
@@ -121,7 +122,7 @@ router.get('/me/status', authRequired, async (req, res) => {
 
     const users = await User.find(
       { _id: { $in: userIds } },
-      { fullName: 1, profilePictureUrl: 1 },
+      { fullName: 1, profilePictureKey: 1 },
     ).lean();
 
     const userMap = new Map(users.map((user) => [user._id.toString(), user]));
@@ -144,7 +145,7 @@ router.get('/me/status', authRequired, async (req, res) => {
       leaderboardMap.get(superlativeId).push({
         user_id: targetUser._id,
         full_name: targetUser.fullName,
-        profile_picture_url: targetUser.profilePictureUrl,
+        profile_picture_url: await signMediaUrl(targetUser.profilePictureKey),
         vote_count: row.votes,
       });
     }

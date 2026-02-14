@@ -27,6 +27,12 @@ type MeResponse = {
   batch: BatchInfo | null;
 };
 
+type PresignUploadResponse = {
+  upload_url: string;
+  object_key: string;
+  required_headers?: Record<string, string>;
+};
+
 export function ProfileEditPage() {
   const navigate = useNavigate();
 
@@ -201,17 +207,44 @@ export function ProfileEditPage() {
       });
 
       if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
+        const presignResponse = await api.post<PresignUploadResponse>(
+          '/api/v1/uploads/presign',
+          {
+            kind: 'profile',
+            mime_type: file.type,
+            size_bytes: file.size,
+          },
+        );
 
-        await api.post('/api/v1/users/me/profile-picture', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        const uploadHeaders = new Headers(presignResponse.data.required_headers ?? {});
+        if (!uploadHeaders.has('Content-Type')) {
+          uploadHeaders.set('Content-Type', file.type || 'application/octet-stream');
+        }
+
+        const uploadResponse = await fetch(presignResponse.data.upload_url, {
+          method: 'PUT',
+          headers: uploadHeaders,
+          body: file,
+        });
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload profile image to storage.');
+        }
+
+        await api.post('/api/v1/users/me/profile-picture', {
+          object_key: presignResponse.data.object_key,
         });
       }
 
       navigate('/app');
     } catch (errorValue: unknown) {
-      setError(getApiErrorMessage(errorValue, 'Failed to update profile'));
+      const apiMessage = getApiErrorMessage(errorValue, '');
+      if (apiMessage) {
+        setError(apiMessage);
+      } else if (errorValue instanceof Error && errorValue.message) {
+        setError(errorValue.message);
+      } else {
+        setError('Failed to update profile');
+      }
     } finally {
       setSaving(false);
     }

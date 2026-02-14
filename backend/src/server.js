@@ -11,6 +11,7 @@ import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import superlativeRoutes from './routes/superlatives.js';
 import memoryRoutes from './routes/memories.js';
+import uploadRoutes from './routes/uploads.js';
 import {
   ensureDefaultSuperlatives,
   enforceSingleProfileReaction,
@@ -59,6 +60,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/batches', batchRoutes);
 app.use('/api/v1/superlatives', superlativeRoutes);
 app.use('/api/v1/memories', memoryRoutes);
+app.use('/api/v1/uploads', uploadRoutes);
 
 async function start() {
   try {

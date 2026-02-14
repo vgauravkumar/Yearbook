@@ -93,6 +93,12 @@ type Notice = {
   message: string;
 };
 
+type PresignUploadResponse = {
+  upload_url: string;
+  object_key: string;
+  required_headers?: Record<string, string>;
+};
+
 type ReactionState = {
   liked: boolean;
   superliked: boolean;
@@ -838,12 +844,32 @@ export function DirectoryPage() {
     setMemoryUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', memoryFile);
-      formData.append('caption', memoryCaption);
+      const presignResponse = await api.post<PresignUploadResponse>(
+        '/api/v1/uploads/presign',
+        {
+          kind: 'memory',
+          mime_type: memoryFile.type,
+          size_bytes: memoryFile.size,
+        },
+      );
 
-      const response = await api.post('/api/v1/memories', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const uploadHeaders = new Headers(presignResponse.data.required_headers ?? {});
+      if (!uploadHeaders.has('Content-Type')) {
+        uploadHeaders.set('Content-Type', memoryFile.type || 'application/octet-stream');
+      }
+
+      const uploadResponse = await fetch(presignResponse.data.upload_url, {
+        method: 'PUT',
+        headers: uploadHeaders,
+        body: memoryFile,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload memory to storage.');
+      }
+
+      const response = await api.post('/api/v1/memories', {
+        object_key: presignResponse.data.object_key,
+        caption: memoryCaption,
       });
 
       const createdMemory: MemoryItem = response.data;
@@ -853,9 +879,12 @@ export function DirectoryPage() {
 
       setNotice({ tone: 'success', message: 'Memory posted to your class stream.' });
     } catch (errorValue: unknown) {
+      const apiMessage = getApiErrorMessage(errorValue, '');
       setNotice({
         tone: 'error',
-        message: getApiErrorMessage(errorValue, 'Unable to post memory'),
+        message:
+          apiMessage ||
+          (errorValue instanceof Error ? errorValue.message : 'Unable to post memory'),
       });
     } finally {
       setMemoryUploading(false);

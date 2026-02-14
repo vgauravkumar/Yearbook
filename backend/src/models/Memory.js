@@ -14,7 +14,7 @@ const MemorySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    mediaUrl: {
+    mediaKey: {
       type: String,
       required: true,
     },
@@ -23,11 +23,7 @@ const MemorySchema = new mongoose.Schema(
       enum: ['image', 'video'],
       required: true,
     },
-    cloudinaryPublicId: {
-      type: String,
-      default: null,
-    },
-    thumbnailUrl: {
+    thumbnailKey: {
       type: String,
       default: null,
     },

@@ -10,16 +10,22 @@ import { Like } from '../models/Like.js';
 import { Comment } from '../models/Comment.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
 import { Superlative } from '../models/Superlative.js';
-import multer from 'multer';
-import fs from 'fs/promises';
-import { uploadProfileImage, deleteImage } from '../services/imageService.js';
+import {
+  PROFILE_MAX_BYTES,
+  isAllowedProfileMimeType,
+  normalizeMimeType,
+} from '../services/uploadPolicy.js';
+import {
+  buildProfileObjectKey,
+  deleteObject,
+  headObject,
+  isProfileObjectKeyForUser,
+  isS3NotFoundError,
+} from '../services/imageService.js';
+import { signMediaUrl } from '../services/mediaUrlService.js';
 
 const router = express.Router();
 const profanityFilter = new Filter();
-const upload = multer({
-  dest: 'uploads/',
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-});
 
 // Helper to check freeze
 async function ensureNotFrozen(batchId) {
@@ -31,6 +37,10 @@ async function ensureNotFrozen(batchId) {
   return { frozen: isFrozen, batch };
 }
 
+async function resolveProfilePictureUrl(profilePictureKey) {
+  return signMediaUrl(profilePictureKey);
+}
+
 // GET /api/v1/users/me
 router.get('/me', authRequired, async (req, res) => {
   try {
@@ -40,12 +50,13 @@ router.get('/me', authRequired, async (req, res) => {
       .exec();
 
     const batch = userBatch?.batchId;
+    const profilePictureUrl = await resolveProfilePictureUrl(user.profilePictureKey);
 
     return res.json({
       id: user._id,
       email: user.email,
       full_name: user.fullName,
-      profile_picture_url: user.profilePictureUrl,
+      profile_picture_url: profilePictureUrl,
       bio: user.bio,
       social_links: user.socialLinks,
       has_completed_onboarding: !!batch,
@@ -357,54 +368,75 @@ router.patch('/me/comments/visibility', authRequired, async (req, res) => {
 });
 
 // POST /api/v1/users/me/profile-picture
-router.post(
-  '/me/profile-picture',
-  authRequired,
-  upload.single('file'),
-  async (req, res) => {
-    try {
-      const user = req.user;
-      const userBatch = await UserBatch.findOne({
-        userId: user._id,
-        isPrimary: true,
-      });
-      if (userBatch) {
-        const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-        if (frozen) {
-          return res.status(403).json({
-            error: 'Profile editing disabled after freeze date',
-            freeze_date: batch.freezeDate,
-          });
-        }
+router.post('/me/profile-picture', authRequired, async (req, res) => {
+  try {
+    const user = req.user;
+    const userBatch = await UserBatch.findOne({
+      userId: user._id,
+      isPrimary: true,
+    });
+    if (userBatch) {
+      const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
+      if (frozen) {
+        return res.status(403).json({
+          error: 'Profile editing disabled after freeze date',
+          freeze_date: batch.freezeDate,
+        });
       }
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'File is required' });
-      }
-
-      const uploadResult = await uploadProfileImage(req.file.path, user._id);
-
-      // Clean up local temp file
-      await fs.unlink(req.file.path).catch(() => {});
-
-      if (user.cloudinaryPublicId && user.cloudinaryPublicId !== uploadResult.public_id) {
-        await deleteImage(user.cloudinaryPublicId);
-      }
-
-      user.profilePictureUrl = uploadResult.secure_url;
-      user.cloudinaryPublicId = uploadResult.public_id;
-      await user.save();
-
-      return res.json({
-        profile_picture_url: user.profilePictureUrl,
-        cloudinary_public_id: user.cloudinaryPublicId,
-      });
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Internal server error' });
     }
-  },
-);
+
+    const objectKeyRaw =
+      typeof req.body?.object_key === 'string' ? req.body.object_key.trim() : '';
+    if (!objectKeyRaw) {
+      return res.status(400).json({ error: 'object_key is required' });
+    }
+
+    const userId = user._id.toString();
+    if (!isProfileObjectKeyForUser(objectKeyRaw, userId)) {
+      return res.status(400).json({ error: 'Invalid profile object key' });
+    }
+
+    let objectMeta = null;
+    try {
+      objectMeta = await headObject({ key: objectKeyRaw });
+    } catch (err) {
+      if (isS3NotFoundError(err)) {
+        return res.status(400).json({ error: 'Uploaded file not found' });
+      }
+      throw err;
+    }
+
+    const objectContentType = normalizeMimeType(objectMeta.contentType);
+    if (!isAllowedProfileMimeType(objectContentType)) {
+      return res.status(400).json({ error: 'Unsupported profile image type' });
+    }
+
+    if (
+      typeof objectMeta.contentLength === 'number' &&
+      objectMeta.contentLength > PROFILE_MAX_BYTES
+    ) {
+      return res.status(400).json({ error: 'Image must be smaller than 5MB.' });
+    }
+
+    const previousObjectKey = user.profilePictureKey;
+    const expectedProfileKey = buildProfileObjectKey(userId);
+    user.profilePictureKey = expectedProfileKey;
+    await user.save();
+
+    if (previousObjectKey && previousObjectKey !== expectedProfileKey) {
+      await deleteObject(previousObjectKey).catch(() => {});
+    }
+
+    const profilePictureUrl = await resolveProfilePictureUrl(user.profilePictureKey);
+
+    return res.json({
+      profile_picture_url: profilePictureUrl,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // GET /api/v1/users/:userId
 router.get('/:userId', authRequired, async (req, res) => {
@@ -433,7 +465,7 @@ router.get('/:userId', authRequired, async (req, res) => {
     const comments = await Comment.find(commentFilter)
       .sort({ createdAt: -1 })
       .limit(10)
-      .populate('fromUserId', 'fullName profilePictureUrl')
+      .populate('fromUserId', 'fullName profilePictureKey')
       .lean();
 
     const superlatives = await Superlative.find({ isActive: true }).lean();
@@ -465,26 +497,33 @@ router.get('/:userId', authRequired, async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const profilePictureUrl = await resolveProfilePictureUrl(user.profilePictureKey);
+    const mappedComments = await Promise.all(
+      comments.map(async (comment) => ({
+        id: comment._id,
+        from_user: {
+          id: comment.fromUserId._id,
+          full_name: comment.fromUserId.fullName,
+          profile_picture_url: await resolveProfilePictureUrl(
+            comment.fromUserId.profilePictureKey,
+          ),
+        },
+        content: comment.content,
+        created_at: comment.createdAt,
+        is_visible: comment.isVisible,
+      })),
+    );
+
     return res.json({
       id: user._id,
       full_name: user.fullName,
-      profile_picture_url: user.profilePictureUrl,
+      profile_picture_url: profilePictureUrl,
       bio: user.bio,
       social_links: user.socialLinks,
       like_count: likeCount,
       superlike_count: superlikeCount,
       superlatives: supList,
-      comments: comments.map((c) => ({
-        id: c._id,
-        from_user: {
-          id: c.fromUserId._id,
-          full_name: c.fromUserId.fullName,
-          profile_picture_url: c.fromUserId.profilePictureUrl,
-        },
-        content: c.content,
-        created_at: c.createdAt,
-        is_visible: c.isVisible,
-      })),
+      comments: mappedComments,
       is_owner: isOwner,
       current_user_interactions: {
         has_liked: !!currentReaction && !currentReaction.isSuperlike,

@@ -1,6 +1,4 @@
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
-const cloudinaryCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? '';
-const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ?? '';
 
 if (!import.meta.env.VITE_API_URL && import.meta.env.DEV) {
   console.warn(
@@ -11,8 +9,4 @@ if (!import.meta.env.VITE_API_URL && import.meta.env.DEV) {
 
 export const env = {
   apiUrl,
-  cloudinary: {
-    cloudName: cloudinaryCloudName,
-    uploadPreset: cloudinaryUploadPreset,
-  },
 };
