@@ -23,8 +23,9 @@ async function ensureNotFrozen(batchId) {
   if (!batch) return { frozen: false, batch: null };
 
   const now = new Date();
+  const freezeAt = batch.freezeDate ? new Date(batch.freezeDate).getTime() : null;
   const isFrozen =
-    batch.isFrozen || (batch.freezeDate && now.getTime() > batch.freezeDate.getTime());
+    batch.isFrozen || (freezeAt && now.getTime() > freezeAt);
 
   return { frozen: isFrozen, batch };
 }

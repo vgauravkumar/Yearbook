@@ -1,31 +1,7 @@
-import mongoose from 'mongoose';
+import { createModel } from '../db/baseModel.js';
 
-const LikeSchema = new mongoose.Schema(
-  {
-    fromUserId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    toUserId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    isSuperlike: {
-      type: Boolean,
-      default: false,
-    },
+export const Like = createModel('Like', {
+  defaults: {
+    isSuperlike: false,
   },
-  {
-    timestamps: true,
-  },
-);
-
-// A user can have only one active reaction per profile:
-// either like OR superlike.
-LikeSchema.index({ fromUserId: 1, toUserId: 1 }, { unique: true });
-LikeSchema.index({ toUserId: 1 });
-LikeSchema.index({ fromUserId: 1 });
-
-export const Like = mongoose.model('Like', LikeSchema);
+});

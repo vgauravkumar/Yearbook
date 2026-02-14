@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 import { Institution } from '../models/Institution.js';
@@ -149,10 +148,6 @@ async function resolveTargetBatch() {
 }
 
 async function main() {
-  const mongoUri =
-    getArgValue('--mongo-uri') ||
-    process.env.MONGODB_URI ||
-    'mongodb://localhost:27017/yearbook';
   const imagesDir =
     getArgValue('--images-dir') ||
     process.env.DEMO_IMAGES_DIR ||
@@ -171,9 +166,7 @@ async function main() {
     },
   });
 
-  console.log(`Connecting to MongoDB: ${mongoUri}`);
-  await mongoose.connect(mongoUri);
-  console.log('Connected to MongoDB.');
+  console.log('Using DynamoDB via configured AWS credentials.');
 
   const { institution, batch } = await resolveTargetBatch();
   const passwordHash = await bcrypt.hash('123123', 10);
@@ -222,15 +215,18 @@ async function main() {
       uploadedCount += 1;
     }
 
-    await UserBatch.updateMany(
-      { userId: user._id, batchId: { $ne: batch._id } },
-      { $set: { isPrimary: false } },
-    );
+    const memberships = await UserBatch.find({ userId: user._id });
+    for (const membership of memberships) {
+      if (membership.batchId !== batch._id && membership.isPrimary) {
+        membership.isPrimary = false;
+        await membership.save();
+      }
+    }
 
     await UserBatch.findOneAndUpdate(
       { userId: user._id, batchId: batch._id },
-      { $set: { isPrimary: true } },
-      { upsert: true, returnDocument: 'after' },
+      { isPrimary: true },
+      { upsert: true },
     );
   }
 
@@ -246,7 +242,4 @@ main()
   .catch((err) => {
     console.error('Failed to seed demo users:', err);
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await mongoose.disconnect().catch(() => {});
   });

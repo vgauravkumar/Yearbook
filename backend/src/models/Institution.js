@@ -1,24 +1,7 @@
-import mongoose from 'mongoose';
+import { createModel } from '../db/baseModel.js';
 
-const InstitutionSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 255,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
+export const Institution = createModel('Institution', {
+  defaults: {
+    isVerified: false,
   },
-  {
-    timestamps: true,
-  },
-);
-
-InstitutionSchema.index({ name: 'text' });
-
-export const Institution = mongoose.model('Institution', InstitutionSchema);
-
+});

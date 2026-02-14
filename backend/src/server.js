@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import mongoose from 'mongoose';
+import { ScanCommand } from '@aws-sdk/lib-dynamodb';
 
 import { env } from './config/env.js';
+import { dynamo, TABLE_NAME } from './db/dynamoClient.js';
 import authRoutes from './routes/auth.js';
 import institutionRoutes from './routes/institutions.js';
 import userRoutes from './routes/users.js';
@@ -64,8 +65,13 @@ app.use('/api/v1/uploads', uploadRoutes);
 
 async function start() {
   try {
-    await mongoose.connect(env.mongoUri);
-    console.log('Connected to MongoDB');
+    await dynamo.send(
+      new ScanCommand({
+        TableName: TABLE_NAME,
+        Limit: 1,
+      }),
+    );
+    console.log('Connected to DynamoDB');
     await ensureDefaultSuperlatives();
     console.log('Default superlatives ensured');
     const cleanedLikes = await enforceSingleProfileReaction();

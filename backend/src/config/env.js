@@ -13,7 +13,6 @@ function requireEnv(key) {
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || '3000'),
-  mongoUri: requireEnv('MONGODB_URI'),
   jwtSecret: requireEnv('JWT_SECRET'),
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   frontendUrl: requireEnv('FRONTEND_URL'),
@@ -24,6 +23,9 @@ export const env = {
     accessKeyId: requireEnv('AWS_ACCESS_KEY_ID'),
     secretAccessKey: requireEnv('AWS_SECRET_ACCESS_KEY'),
     s3Bucket: requireEnv('AWS_S3_BUCKET'),
+  },
+  dynamo: {
+    tableName: requireEnv('DYNAMODB_TABLE'),
   },
   s3: {
     presignedUploadExpiresSec: Number(
