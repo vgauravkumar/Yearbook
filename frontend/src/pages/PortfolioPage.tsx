@@ -103,6 +103,19 @@ function PortfolioPage() {
               </div>
             </div>
 
+            <article className="current-status-card reveal-up delay-2">
+              <p className="label">Current</p>
+              <h3>Indie Developer and Freelance Builder</h3>
+              <p>
+                Shipping product ideas end-to-end, taking selective freelance projects,
+                and partnering with teams that need fast, reliable execution.
+              </p>
+              <div className="status-trackers">
+                <span>Open to freelance work</span>
+                <span>Product-focused builds</span>
+              </div>
+            </article>
+
             <div className="stat-grid reveal-up delay-2">
               {stats.map((item) => (
                 <article key={item.label}>

@@ -41,6 +41,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  position: relative;
+  isolation: isolate;
 }
 
 body {
@@ -143,6 +145,52 @@ button {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.app-frame {
+  position: relative;
+  z-index: 2;
+}
+
+.site-aurora {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.9;
+}
+
+.site-aurora-band {
+  display: block;
+  position: absolute;
+  width: 90vw;
+  height: 40vh;
+  border-radius: 999px;
+  filter: blur(36px);
+  opacity: 0.62;
+  transform-origin: center;
+}
+
+.site-aurora-band-1 {
+  top: -2%;
+  left: -20%;
+  background: linear-gradient(100deg, rgba(255, 145, 104, 0.62), rgba(80, 165, 255, 0.44));
+  animation: auroraDriftOne 12s ease-in-out infinite alternate;
+}
+
+.site-aurora-band-2 {
+  top: 28%;
+  left: 10%;
+  background: linear-gradient(110deg, rgba(72, 153, 255, 0.54), rgba(95, 216, 190, 0.36));
+  animation: auroraDriftTwo 14s ease-in-out infinite alternate;
+}
+
+.site-aurora-band-3 {
+  bottom: -12%;
+  right: -22%;
+  background: linear-gradient(120deg, rgba(255, 173, 111, 0.44), rgba(84, 160, 255, 0.42));
+  animation: auroraDriftThree 13s ease-in-out infinite alternate;
 }
 
 .top-nav {
@@ -1077,7 +1125,41 @@ button {
 }
 
 .landing-page {
+  position: relative;
   gap: 0.9rem;
+  overflow: hidden;
+}
+
+.landing-page .panel {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.34));
+  backdrop-filter: blur(6px);
+}
+
+@keyframes auroraDriftOne {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-6deg) scale(1);
+  }
+  100% {
+    transform: translate3d(14vw, 4vh, 0) rotate(6deg) scale(1.08);
+  }
+}
+
+@keyframes auroraDriftTwo {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(4deg) scale(1);
+  }
+  100% {
+    transform: translate3d(-10vw, 7vh, 0) rotate(-5deg) scale(1.06);
+  }
+}
+
+@keyframes auroraDriftThree {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-4deg) scale(1);
+  }
+  100% {
+    transform: translate3d(-12vw, -7vh, 0) rotate(5deg) scale(1.07);
+  }
 }
 
 .landing-nav {

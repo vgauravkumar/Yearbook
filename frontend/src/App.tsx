@@ -10,16 +10,23 @@ import { ProfilePage } from './pages/ProfilePage';
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/app" element={<DirectoryPage />} />
-        <Route path="/directory" element={<Navigate to="/app" replace />} />
-        <Route path="/profile/:userId" element={<ProfilePage />} />
-        <Route path="/profile/edit" element={<ProfileEditPage />} />
-        <Route path="/resume" element={<PortfolioPage />} />
-        <Route path="/" element={<HomePage />} />
-      </Routes>
+      <div className="site-aurora" aria-hidden="true">
+        <span className="site-aurora-band site-aurora-band-1" />
+        <span className="site-aurora-band site-aurora-band-2" />
+        <span className="site-aurora-band site-aurora-band-3" />
+      </div>
+      <div className="app-frame">
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/app" element={<DirectoryPage />} />
+          <Route path="/directory" element={<Navigate to="/app" replace />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} />
+          <Route path="/profile/edit" element={<ProfileEditPage />} />
+          <Route path="/resume" element={<PortfolioPage />} />
+          <Route path="/" element={<HomePage />} />
+        </Routes>
+      </div>
     </BrowserRouter>
   );
 }
