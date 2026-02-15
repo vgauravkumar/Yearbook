@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 
 import { User } from '../models/User.js';
 import { UserBatch } from '../models/UserBatch.js';
@@ -9,6 +10,29 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
 const router = express.Router();
+
+function createAuthRateLimiter(max, message) {
+  return rateLimit({
+    windowMs: env.authRateLimitWindowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: message },
+  });
+}
+
+const registerLimiter = createAuthRateLimiter(
+  env.authRegisterMaxRequests,
+  'Too many signup attempts. Please try again shortly.',
+);
+const loginLimiter = createAuthRateLimiter(
+  env.authLoginMaxRequests,
+  'Too many login attempts. Please try again shortly.',
+);
+const verifyLimiter = createAuthRateLimiter(
+  env.authVerifyMaxRequests,
+  'Too many verification attempts. Please try again shortly.',
+);
 
 async function hasCompletedOnboarding(userId) {
   const primary = await UserBatch.findOne({ userId, isPrimary: true }).lean();
@@ -34,7 +58,7 @@ function signTokens(user) {
 }
 
 // POST /api/v1/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { email, password, full_name: fullName } = req.body;
     if (!email || !password || !fullName) {
@@ -81,7 +105,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/v1/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -118,7 +142,7 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/v1/auth/verify-email
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', verifyLimiter, async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) {

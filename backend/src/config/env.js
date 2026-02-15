@@ -18,6 +18,10 @@ export const env = {
   frontendUrl: requireEnv('FRONTEND_URL'),
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
   rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  authRateLimitWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '60000'),
+  authLoginMaxRequests: Number(process.env.AUTH_LOGIN_MAX_REQUESTS || '10'),
+  authRegisterMaxRequests: Number(process.env.AUTH_REGISTER_MAX_REQUESTS || '5'),
+  authVerifyMaxRequests: Number(process.env.AUTH_VERIFY_MAX_REQUESTS || '10'),
   aws: {
     region: requireEnv('AWS_REGION'),
     s3Bucket: requireEnv('AWS_S3_BUCKET'),

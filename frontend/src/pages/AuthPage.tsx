@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../utils/errors';
 type Mode = 'login' | 'register';
 
 export function AuthPage() {
+  const AUTH_SUBMIT_COOLDOWN_MS = 3000;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>('register');
@@ -14,8 +15,11 @@ export function AuthPage() {
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const cooldownRemainingMs = Math.max(0, cooldownUntil - Date.now());
+  const cooldownRemainingSeconds = Math.ceil(cooldownRemainingMs / 1000);
 
   useEffect(() => {
     const requestedMode = searchParams.get('mode');
@@ -31,6 +35,11 @@ export function AuthPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (cooldownRemainingMs > 0) {
+      setError(`Please wait ${cooldownRemainingSeconds}s before trying again.`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setNotice(null);
@@ -52,6 +61,7 @@ export function AuthPage() {
     } catch (errorValue: unknown) {
       setError(getApiErrorMessage(errorValue, 'Something went wrong'));
     } finally {
+      setCooldownUntil(Date.now() + AUTH_SUBMIT_COOLDOWN_MS);
       setLoading(false);
     }
   }
@@ -153,9 +163,15 @@ export function AuthPage() {
             {notice && <p className="inline-notice success">{notice}</p>}
             {error && <p className="inline-notice error">{error}</p>}
 
-            <button type="submit" disabled={loading} className="btn btn-primary btn-block">
+            <button
+              type="submit"
+              disabled={loading || cooldownRemainingMs > 0}
+              className="btn btn-primary btn-block"
+            >
               {loading
                 ? 'Please wait...'
+                : cooldownRemainingMs > 0
+                  ? `Try again in ${cooldownRemainingSeconds}s`
                 : mode === 'register'
                   ? 'Create account'
                   : 'Continue'}
