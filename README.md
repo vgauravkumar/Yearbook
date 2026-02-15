@@ -48,8 +48,6 @@ JWT_SECRET=your-secret
 JWT_EXPIRE=7d
 
 AWS_REGION=your-region
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_S3_BUCKET=your-s3-bucket
 DYNAMODB_TABLE=your-dynamodb-table
 
@@ -64,6 +62,10 @@ EMAIL_PORT=587
 EMAIL_USER=your-email-user
 EMAIL_PASS=your-email-pass
 ```
+
+The backend uses the AWS SDK default credential chain.
+- Local development: run with an AWS profile that can access your S3 bucket and DynamoDB table (for example `AWS_PROFILE=yearbook-dev npm run dev`).
+- App Runner production: attach an instance role with least-privilege permissions for S3 and DynamoDB.
 
 4. Start backend:
 

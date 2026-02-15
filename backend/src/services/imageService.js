@@ -11,10 +11,6 @@ import { env } from '../config/env.js';
 
 const s3Client = new S3Client({
   region: env.aws.region,
-  credentials: {
-    accessKeyId: env.aws.accessKeyId,
-    secretAccessKey: env.aws.secretAccessKey,
-  },
 });
 
 function getFileExtension(contentType) {

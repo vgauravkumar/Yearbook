@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { Filter } from 'bad-words';
 
 import { authRequired } from '../middleware/auth.js';
@@ -177,7 +178,7 @@ router.get('/feed', authRequired, async (req, res) => {
       freeze_date: batch?.freezeDate ?? null,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Memories route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -291,7 +292,7 @@ router.post('/', authRequired, async (req, res) => {
       await deleteObject(uploadedObjectKey).catch(() => {});
     }
 
-    console.error(err);
+    logger.error('Memories route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -352,7 +353,7 @@ router.post('/:memoryId/react', authRequired, async (req, res) => {
       like_count: likeCount,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Memories route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -384,7 +385,7 @@ router.delete('/:memoryId', authRequired, async (req, res) => {
 
     return res.json({ message: 'Memory deleted' });
   } catch (err) {
-    console.error(err);
+    logger.error('Memories route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

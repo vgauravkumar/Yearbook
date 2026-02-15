@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { Institution } from '../models/Institution.js';
 
 const router = express.Router();
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
       })),
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Institutions route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -44,7 +45,7 @@ router.get('/search', async (req, res) => {
       })),
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Institutions route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -69,7 +70,7 @@ router.post('/', async (req, res) => {
       name: institution.name,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Institutions route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

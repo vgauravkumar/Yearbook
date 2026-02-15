@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { User } from '../models/User.js';
 import { UserBatch } from '../models/UserBatch.js';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -58,6 +59,14 @@ router.post('/register', async (req, res) => {
       isVerified: false,
     });
 
+    const totalUsers = await User.countDocuments({});
+    if (totalUsers > 0 && totalUsers % 50 === 0) {
+      logger.info('User milestone reached', {
+        totalUsers,
+        milestone: 50,
+      });
+    }
+
     // TODO: send verification email using env.email settings
 
     return res.status(201).json({
@@ -66,7 +75,7 @@ router.post('/register', async (req, res) => {
       message: 'Verification email sent',
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Auth register failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -103,7 +112,7 @@ router.post('/login', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Auth login failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -127,10 +136,9 @@ router.post('/verify-email', async (req, res) => {
 
     return res.json({ message: 'Email verified successfully' });
   } catch (err) {
-    console.error(err);
+    logger.error('Email verification failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 export default router;
-

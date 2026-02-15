@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { User } from '../models/User.js';
 import { UserBatch } from '../models/UserBatch.js';
 import { Like } from '../models/Like.js';
@@ -151,7 +152,7 @@ router.get('/:batchId/students', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Batches route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

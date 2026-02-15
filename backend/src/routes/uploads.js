@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 
 import { authRequired } from '../middleware/auth.js';
 import { UserBatch } from '../models/UserBatch.js';
@@ -119,7 +120,7 @@ router.post('/presign', authRequired, async (req, res) => {
       required_headers: presignedUpload.requiredHeaders,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Uploads route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { Superlative } from '../models/Superlative.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
 import { UserBatch } from '../models/UserBatch.js';
@@ -42,7 +43,7 @@ router.get('/', async (_req, res) => {
       superlatives: superlatives.map(mapSuperlative),
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Superlatives route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -162,7 +163,7 @@ router.get('/me/status', authRequired, async (req, res) => {
       leaderboards,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Superlatives route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -241,7 +242,7 @@ router.post('/:superlativeId/vote', authRequired, async (req, res) => {
       remaining_votes: superlative.maxVotesPerUser - votesUsed,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Superlatives route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

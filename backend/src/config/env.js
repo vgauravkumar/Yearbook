@@ -20,8 +20,6 @@ export const env = {
   rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   aws: {
     region: requireEnv('AWS_REGION'),
-    accessKeyId: requireEnv('AWS_ACCESS_KEY_ID'),
-    secretAccessKey: requireEnv('AWS_SECRET_ACCESS_KEY'),
     s3Bucket: requireEnv('AWS_S3_BUCKET'),
   },
   dynamo: {

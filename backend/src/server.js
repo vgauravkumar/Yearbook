@@ -13,6 +13,8 @@ import batchRoutes from './routes/batches.js';
 import superlativeRoutes from './routes/superlatives.js';
 import memoryRoutes from './routes/memories.js';
 import uploadRoutes from './routes/uploads.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import { logger } from './utils/logger.js';
 import {
   ensureDefaultSuperlatives,
   enforceSingleProfileReaction,
@@ -36,6 +38,7 @@ app.use(
 
 // JSON body parsing
 app.use(express.json({ limit: '1mb' }));
+app.use(requestLogger);
 
 // Basic rate limiting
 const limiter = rateLimit({
@@ -63,6 +66,20 @@ app.use('/api/v1/superlatives', superlativeRoutes);
 app.use('/api/v1/memories', memoryRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
 
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+app.use((err, req, res, _next) => {
+  logger.error('Unhandled server error', {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.originalUrl,
+    error: err,
+  });
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 async function start() {
   try {
     await dynamo.send(
@@ -71,19 +88,19 @@ async function start() {
         Limit: 1,
       }),
     );
-    console.log('Connected to DynamoDB');
+    logger.info('Connected to DynamoDB');
     await ensureDefaultSuperlatives();
-    console.log('Default superlatives ensured');
+    logger.info('Default superlatives ensured');
     const cleanedLikes = await enforceSingleProfileReaction();
     if (cleanedLikes > 0) {
-      console.log(`Removed ${cleanedLikes} duplicate profile reactions`);
+      logger.info('Removed duplicate profile reactions', { cleanedLikes });
     }
 
     app.listen(env.port, () => {
-      console.log(`Yearbook API listening on port ${env.port}`);
+      logger.info('Yearbook API listening', { port: env.port, env: env.nodeEnv });
     });
   } catch (err) {
-    console.error('Failed to start server', err);
+    logger.error('Failed to start server', { error: err });
     process.exit(1);
   }
 }

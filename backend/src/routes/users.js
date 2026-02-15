@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/logger.js';
 import { Filter } from 'bad-words';
 
 import { authRequired } from '../middleware/auth.js';
@@ -72,7 +73,7 @@ router.get('/me', authRequired, async (req, res) => {
         : null,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     if (err.name === 'ValidationError') {
       const firstKey = Object.keys(err.errors)[0];
       const message =
@@ -145,7 +146,7 @@ router.post('/onboard', authRequired, async (req, res) => {
       freeze_date: batch.freezeDate,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -192,7 +193,7 @@ router.put('/me', authRequired, async (req, res) => {
       updated_at: user.updatedAt,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -282,7 +283,7 @@ router.post('/:userId/like', authRequired, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -335,7 +336,7 @@ router.post('/:userId/comments', authRequired, async (req, res) => {
       is_visible: comment.isVisible,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -363,7 +364,7 @@ router.patch('/me/comments/visibility', authRequired, async (req, res) => {
       visible_count: visibleCount,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -434,7 +435,7 @@ router.post('/me/profile-picture', authRequired, async (req, res) => {
       profile_picture_url: profilePictureUrl,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -532,7 +533,7 @@ router.get('/:userId', authRequired, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Users route failed', { error: err });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

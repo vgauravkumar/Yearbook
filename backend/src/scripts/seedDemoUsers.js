@@ -154,19 +154,13 @@ async function main() {
     '/Users/gaurav/Documents/Professional/IT/Others/Garbage/Photos';
 
   const awsRegion = requireEnv('AWS_REGION');
-  const awsAccessKeyId = requireEnv('AWS_ACCESS_KEY_ID');
-  const awsSecretAccessKey = requireEnv('AWS_SECRET_ACCESS_KEY');
   const awsBucket = requireEnv('AWS_S3_BUCKET');
 
   const s3Client = new S3Client({
     region: awsRegion,
-    credentials: {
-      accessKeyId: awsAccessKeyId,
-      secretAccessKey: awsSecretAccessKey,
-    },
   });
 
-  console.log('Using DynamoDB via configured AWS credentials.');
+  console.log('Using AWS default credentials provider chain.');
 
   const { institution, batch } = await resolveTargetBatch();
   const passwordHash = await bcrypt.hash('123123', 10);
