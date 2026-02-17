@@ -130,17 +130,19 @@ Set App Runner environment variables from backend `.env` equivalents.
 
 ### SPA Rewrite Rule
 
-Use this rewrite for client-side routing:
+Use this rewrite for client-side routing. It preserves real static files (`.js`, `.css`, images, fonts) and only rewrites app routes:
 
 ```json
 [
   {
-    "source": "/<*>",
+    "source": "</^[^.]+$|\\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|webp|woff|woff2|ttf|map|json)$)([^.]+$)/>",
     "target": "/index.html",
     "status": "200"
   }
 ]
 ```
+
+For custom domains, configure DNS records directly to Amplify (CNAME/ALIAS) and avoid GoDaddy forwarding/masking.
 
 ## 3) Final Wiring
 
