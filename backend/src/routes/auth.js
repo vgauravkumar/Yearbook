@@ -5,9 +5,9 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 
 import { User } from '../models/User.js';
-import { UserBatch } from '../models/UserBatch.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import { getCurrentBatchIdForUser } from '../services/batchService.js';
 
 const router = express.Router();
 
@@ -34,9 +34,9 @@ const verifyLimiter = createAuthRateLimiter(
   'Too many verification attempts. Please try again shortly.',
 );
 
-async function hasCompletedOnboarding(userId) {
-  const primary = await UserBatch.findOne({ userId, isPrimary: true }).lean();
-  return !!primary;
+async function hasCompletedOnboarding(user) {
+  const batchId = await getCurrentBatchIdForUser(user);
+  return Boolean(batchId);
 }
 
 function signTokens(user) {
@@ -79,6 +79,7 @@ router.post('/register', registerLimiter, async (req, res) => {
       email,
       passwordHash,
       fullName,
+      batches: [],
       verificationToken,
       isVerified: false,
     });
@@ -123,7 +124,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     }
 
     const { accessToken, refreshToken } = signTokens(user);
-    const completedOnboarding = await hasCompletedOnboarding(user._id);
+    const completedOnboarding = await hasCompletedOnboarding(user);
 
     return res.json({
       access_token: accessToken,

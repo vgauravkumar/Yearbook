@@ -4,9 +4,6 @@ import { Filter } from 'bad-words';
 
 import { authRequired } from '../middleware/auth.js';
 import { User } from '../models/User.js';
-import { Institution } from '../models/Institution.js';
-import { UserBatch } from '../models/UserBatch.js';
-import { Batch } from '../models/Batch.js';
 import { Like } from '../models/Like.js';
 import { Comment } from '../models/Comment.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
@@ -24,34 +21,48 @@ import {
   isS3NotFoundError,
 } from '../services/imageService.js';
 import { signMediaUrl } from '../services/mediaUrlService.js';
+import {
+  buildBatchResponse,
+  ensureBatchWritable,
+  getCurrentBatchByUser,
+  getCurrentBatchMembershipByUserId,
+} from '../services/batchService.js';
 
 const router = express.Router();
 const profanityFilter = new Filter();
 
-// Helper to check freeze
-async function ensureNotFrozen(batchId) {
-  const batch = await Batch.findById(batchId);
-  if (!batch) return { frozen: false };
-  const now = new Date();
-  const freezeAt = batch.freezeDate ? new Date(batch.freezeDate).getTime() : null;
-  const isFrozen =
-    batch.isFrozen || (freezeAt && now.getTime() > freezeAt);
-  return { frozen: isFrozen, batch };
-}
-
 async function resolveProfilePictureUrl(profilePictureKey) {
   return signMediaUrl(profilePictureKey);
+}
+
+async function getViewerBatchId(userId) {
+  const membership = await getCurrentBatchMembershipByUserId(userId);
+  return membership?.batchId ?? null;
+}
+
+async function rejectIfFrozenBatch(batchId, res) {
+  if (!batchId) {
+    return null;
+  }
+
+  const writable = await ensureBatchWritable(batchId);
+  if (!writable.ok && writable.status === 403) {
+    res.status(403).json({ error: writable.error });
+    return false;
+  }
+
+  if (!writable.ok && writable.status === 404) {
+    return null;
+  }
+
+  return writable.batch;
 }
 
 // GET /api/v1/users/me
 router.get('/me', authRequired, async (req, res) => {
   try {
     const user = req.user;
-    const userBatch = await UserBatch.findOne({ userId: user._id, isPrimary: true })
-      .populate('batchId')
-      .exec();
-
-    const batch = userBatch?.batchId;
+    const batch = await getCurrentBatchByUser(user);
     const profilePictureUrl = await resolveProfilePictureUrl(user.profilePictureKey);
 
     return res.json({
@@ -61,16 +72,8 @@ router.get('/me', authRequired, async (req, res) => {
       profile_picture_url: profilePictureUrl,
       bio: user.bio,
       social_links: user.socialLinks,
-      has_completed_onboarding: !!batch,
-      batch: batch
-        ? {
-            id: batch._id,
-            institution: '', // can be populated via another query if needed
-            graduation_year: batch.graduationYear,
-            graduation_month: batch.graduationMonth,
-            is_frozen: batch.isFrozen,
-          }
-        : null,
+      has_completed_onboarding: Boolean(batch),
+      batch: buildBatchResponse(batch),
     });
   } catch (err) {
     logger.error('Users route failed', { error: err });
@@ -84,66 +87,12 @@ router.get('/me', authRequired, async (req, res) => {
   }
 });
 
-// POST /api/v1/users/onboard
-router.post('/onboard', authRequired, async (req, res) => {
+// GET /api/v1/users/me/batch
+router.get('/me/batch', authRequired, async (req, res) => {
   try {
-    const {
-      institution_id: institutionIdRaw,
-      institution_name: institutionName,
-      graduation_year: year,
-      graduation_month: month,
-    } = req.body;
-
-    if (!year || !month) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    let institutionId = institutionIdRaw;
-
-    // If no institution id is provided, create or reuse one from the provided name
-    if (!institutionId) {
-      if (!institutionName || typeof institutionName !== 'string') {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-      const trimmedName = institutionName.trim();
-      if (!trimmedName) {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-      let institution = await Institution.findOne({ name: trimmedName });
-      if (!institution) {
-        institution = await Institution.create({ name: trimmedName });
-      }
-      institutionId = institution._id;
-    }
-
-    let batch = await Batch.findOne({
-      institutionId,
-      graduationYear: year,
-      graduationMonth: month,
-    });
-
-    if (!batch) {
-      // Calculate freeze date as last day of graduation month
-      const freezeDate = new Date(year, month, 0);
-      batch = await Batch.create({
-        institutionId,
-        graduationYear: year,
-        graduationMonth: month,
-        freezeDate,
-      });
-    }
-
-    await UserBatch.findOneAndUpdate(
-      { userId: req.user._id, batchId: batch._id },
-      { isPrimary: true },
-      { upsert: true, new: true },
-    );
-
+    const batch = await getCurrentBatchByUser(req.user);
     return res.json({
-      batch_id: batch._id,
-      graduation_year: batch.graduationYear,
-      graduation_month: batch.graduationMonth,
-      freeze_date: batch.freezeDate,
+      batch: buildBatchResponse(batch),
     });
   } catch (err) {
     logger.error('Users route failed', { error: err });
@@ -155,14 +104,12 @@ router.post('/onboard', authRequired, async (req, res) => {
 router.put('/me', authRequired, async (req, res) => {
   try {
     const user = req.user;
-    const userBatch = await UserBatch.findOne({ userId: user._id, isPrimary: true });
-    if (userBatch) {
-      const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-      if (frozen) {
-        return res.status(403).json({
-          error: 'Profile editing disabled after freeze date',
-          freeze_date: batch.freezeDate,
-        });
+    const batchId = await getViewerBatchId(user._id);
+
+    if (batchId) {
+      const writableBatch = await rejectIfFrozenBatch(batchId, res);
+      if (writableBatch === false) {
+        return;
       }
     }
 
@@ -213,17 +160,14 @@ router.post('/:userId/like', authRequired, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const userBatch = await UserBatch.findOne({ userId: req.user._id, isPrimary: true });
-    if (!userBatch) {
+    const batchId = await getViewerBatchId(req.user._id);
+    if (!batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-    if (frozen) {
-      return res.status(403).json({
-        error: 'Interactions disabled after freeze date',
-        freeze_date: batch.freezeDate,
-      });
+    const writableBatch = await rejectIfFrozenBatch(batchId, res);
+    if (writableBatch === false) {
+      return;
     }
 
     const existingReactions = await Like.find({
@@ -247,7 +191,6 @@ router.post('/:userId/like', authRequired, async (req, res) => {
     } else {
       const [latestReaction, ...staleReactions] = existingReactions;
 
-      // Defensive cleanup for old data where both like and superlike existed.
       if (staleReactions.length > 0) {
         await Like.deleteMany({
           _id: { $in: staleReactions.map((entry) => entry._id) },
@@ -306,16 +249,14 @@ router.post('/:userId/comments', authRequired, async (req, res) => {
       });
     }
 
-    const userBatch = await UserBatch.findOne({ userId: req.user._id, isPrimary: true });
-    if (!userBatch) {
+    const batchId = await getViewerBatchId(req.user._id);
+    if (!batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-    if (frozen) {
-      return res.status(403).json({
-        error: 'Commenting disabled after freeze date',
-        freeze_date: batch.freezeDate,
-      });
+
+    const writableBatch = await rejectIfFrozenBatch(batchId, res);
+    if (writableBatch === false) {
+      return;
     }
 
     const comment = await Comment.create({
@@ -349,6 +290,14 @@ router.patch('/me/comments/visibility', authRequired, async (req, res) => {
       return res.status(400).json({ error: 'is_visible must be a boolean' });
     }
 
+    const batchId = await getViewerBatchId(req.user._id);
+    if (batchId) {
+      const writableBatch = await rejectIfFrozenBatch(batchId, res);
+      if (writableBatch === false) {
+        return;
+      }
+    }
+
     await Comment.updateMany(
       { toUserId: req.user._id },
       { $set: { isVisible } },
@@ -373,17 +322,12 @@ router.patch('/me/comments/visibility', authRequired, async (req, res) => {
 router.post('/me/profile-picture', authRequired, async (req, res) => {
   try {
     const user = req.user;
-    const userBatch = await UserBatch.findOne({
-      userId: user._id,
-      isPrimary: true,
-    });
-    if (userBatch) {
-      const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-      if (frozen) {
-        return res.status(403).json({
-          error: 'Profile editing disabled after freeze date',
-          freeze_date: batch.freezeDate,
-        });
+    const batchId = await getViewerBatchId(user._id);
+
+    if (batchId) {
+      const writableBatch = await rejectIfFrozenBatch(batchId, res);
+      if (writableBatch === false) {
+        return;
       }
     }
 

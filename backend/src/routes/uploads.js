@@ -2,8 +2,6 @@ import express from 'express';
 import { logger } from '../utils/logger.js';
 
 import { authRequired } from '../middleware/auth.js';
-import { UserBatch } from '../models/UserBatch.js';
-import { Batch } from '../models/Batch.js';
 import {
   buildMemoryObjectKey,
   buildProfileObjectKey,
@@ -16,24 +14,21 @@ import {
   isAllowedProfileMimeType,
   normalizeMimeType,
 } from '../services/uploadPolicy.js';
+import {
+  ensureBatchWritable,
+  getCurrentBatchMembershipByUserId,
+} from '../services/batchService.js';
 
 const router = express.Router();
-
-async function ensureNotFrozen(batchId) {
-  const batch = await Batch.findById(batchId);
-  if (!batch) return { frozen: false, batch: null };
-
-  const now = new Date();
-  const freezeAt = batch.freezeDate ? new Date(batch.freezeDate).getTime() : null;
-  const isFrozen =
-    batch.isFrozen || (freezeAt && now.getTime() > freezeAt);
-
-  return { frozen: isFrozen, batch };
-}
 
 function parseSizeBytes(value) {
   if (typeof value !== 'number') return Number.NaN;
   return Number.isFinite(value) ? Math.floor(value) : Number.NaN;
+}
+
+async function getViewerBatchId(userId) {
+  const membership = await getCurrentBatchMembershipByUserId(userId);
+  return membership?.batchId ?? null;
 }
 
 // POST /api/v1/uploads/presign
@@ -61,17 +56,11 @@ router.post('/presign', authRequired, async (req, res) => {
       maxBytes = PROFILE_MAX_BYTES;
       objectKey = buildProfileObjectKey(userId);
 
-      const userBatch = await UserBatch.findOne({
-        userId: req.user._id,
-        isPrimary: true,
-      }).lean();
-      if (userBatch) {
-        const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-        if (frozen) {
-          return res.status(403).json({
-            error: 'Profile editing disabled after freeze date',
-            freeze_date: batch?.freezeDate,
-          });
+      const batchId = await getViewerBatchId(req.user._id);
+      if (batchId) {
+        const writable = await ensureBatchWritable(batchId);
+        if (!writable.ok) {
+          return res.status(writable.status).json({ error: writable.error });
         }
       }
     } else if (kind === 'memory') {
@@ -82,21 +71,14 @@ router.post('/presign', authRequired, async (req, res) => {
       maxBytes = MEMORY_MAX_BYTES;
       objectKey = buildMemoryObjectKey(userId, mimeType);
 
-      const userBatch = await UserBatch.findOne({
-        userId: req.user._id,
-        isPrimary: true,
-      }).lean();
-
-      if (!userBatch) {
+      const batchId = await getViewerBatchId(req.user._id);
+      if (!batchId) {
         return res.status(400).json({ error: 'User not onboarded' });
       }
 
-      const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-      if (frozen) {
-        return res.status(403).json({
-          error: 'Posting memories disabled after freeze date',
-          freeze_date: batch?.freezeDate,
-        });
+      const writable = await ensureBatchWritable(batchId);
+      if (!writable.ok) {
+        return res.status(writable.status).json({ error: writable.error });
       }
     } else {
       return res.status(400).json({ error: 'kind must be profile or memory' });

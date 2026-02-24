@@ -623,6 +623,11 @@ button {
   background: rgba(29, 99, 232, 0.08);
 }
 
+.autocomplete-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 .autocomplete-item.custom {
   color: #5f4f9a;
   background: rgba(124, 104, 238, 0.08);
@@ -631,6 +636,42 @@ button {
 .autocomplete-empty {
   padding: 0.45rem 0.55rem;
   font-size: 0.9rem;
+}
+
+.batch-result-primary,
+.batch-result-secondary {
+  display: block;
+}
+
+.batch-result-primary {
+  font-weight: 600;
+}
+
+.batch-result-secondary {
+  margin-top: 0.1rem;
+  color: #6077a4;
+  font-size: 0.82rem;
+}
+
+.onboarding-warning {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.onboarding-warning-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.join-shell {
+  text-align: left;
+}
+
+.join-batch-label {
+  color: #223f73;
+  font-size: 1.02rem;
+  font-weight: 600;
 }
 
 .home-page .home-grid {
@@ -1828,6 +1869,47 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.invite-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 30, 56, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.invite-modal-card {
+  width: min(560px, 100%);
+  padding: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.invite-modal-card h2 {
+  font-size: clamp(1.3rem, 3.6vw, 1.7rem);
+}
+
+.invite-link {
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(21, 57, 117, 0.2);
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 12px;
+  padding: 0.62rem 0.72rem;
+  color: #20427a;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.invite-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 980px) {

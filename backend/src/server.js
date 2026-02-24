@@ -7,7 +7,6 @@ import { ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { env } from './config/env.js';
 import { dynamo, TABLE_NAME } from './db/dynamoClient.js';
 import authRoutes from './routes/auth.js';
-import institutionRoutes from './routes/institutions.js';
 import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import superlativeRoutes from './routes/superlatives.js';
@@ -19,6 +18,11 @@ import {
   ensureDefaultSuperlatives,
   enforceSingleProfileReaction,
 } from './services/bootstrapService.js';
+import {
+  runBatchFreezeJob,
+  scheduleBatchFreezeJob,
+} from './services/batchFreezeService.js';
+import { migrateLegacyBatchData } from './services/legacyMigrationService.js';
 
 const app = express();
 
@@ -59,7 +63,6 @@ app.get('/health', (_req, res) => {
 
 // API routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/institutions', institutionRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/batches', batchRoutes);
 app.use('/api/v1/superlatives', superlativeRoutes);
@@ -95,6 +98,9 @@ async function start() {
     if (cleanedLikes > 0) {
       logger.info('Removed duplicate profile reactions', { cleanedLikes });
     }
+    await migrateLegacyBatchData();
+    await runBatchFreezeJob(new Date());
+    scheduleBatchFreezeJob();
 
     app.listen(env.port, () => {
       logger.info('Yearbook API listening', { port: env.port, env: env.nodeEnv });

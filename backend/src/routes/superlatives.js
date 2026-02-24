@@ -3,23 +3,19 @@ import { logger } from '../utils/logger.js';
 import { Superlative } from '../models/Superlative.js';
 import { SuperlativeVote } from '../models/SuperlativeVote.js';
 import { UserBatch } from '../models/UserBatch.js';
-import { Batch } from '../models/Batch.js';
 import { User } from '../models/User.js';
 import { authRequired } from '../middleware/auth.js';
 import { signMediaUrl } from '../services/mediaUrlService.js';
+import {
+  ensureBatchWritable,
+  getCurrentBatchMembershipByUserId,
+} from '../services/batchService.js';
 
 const router = express.Router();
 
-async function ensureNotFrozen(batchId) {
-  const batch = await Batch.findById(batchId);
-  if (!batch) return { frozen: false, batch: null };
-
-  const now = new Date();
-  const freezeAt = batch.freezeDate ? new Date(batch.freezeDate).getTime() : null;
-  const isFrozen =
-    batch.isFrozen || (freezeAt && now.getTime() > freezeAt);
-
-  return { frozen: isFrozen, batch };
+async function getViewerBatchId(userId) {
+  const membership = await getCurrentBatchMembershipByUserId(userId);
+  return membership?.batchId ?? null;
 }
 
 function mapSuperlative(superlative) {
@@ -51,12 +47,9 @@ router.get('/', async (_req, res) => {
 // GET /api/v1/superlatives/me/status
 router.get('/me/status', authRequired, async (req, res) => {
   try {
-    const userBatch = await UserBatch.findOne({
-      userId: req.user._id,
-      isPrimary: true,
-    }).lean();
+    const batchId = await getViewerBatchId(req.user._id);
 
-    if (!userBatch) {
+    if (!batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
@@ -68,7 +61,7 @@ router.get('/me/status', authRequired, async (req, res) => {
       {
         $match: {
           fromUserId: req.user._id,
-          batchId: userBatch.batchId,
+          batchId,
         },
       },
       {
@@ -98,7 +91,7 @@ router.get('/me/status', authRequired, async (req, res) => {
     const leaderboardAgg = await SuperlativeVote.aggregate([
       {
         $match: {
-          batchId: userBatch.batchId,
+          batchId,
         },
       },
       {
@@ -187,36 +180,30 @@ router.post('/:superlativeId/vote', authRequired, async (req, res) => {
       return res.status(404).json({ error: 'Superlative not found' });
     }
 
-    const userBatch = await UserBatch.findOne({
-      userId: req.user._id,
-      isPrimary: true,
-    }).lean();
+    const batchId = await getViewerBatchId(req.user._id);
 
-    if (!userBatch) {
+    if (!batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
     const targetIsInBatch = await UserBatch.exists({
       userId: toUserId,
-      batchId: userBatch.batchId,
+      batchId,
     });
 
     if (!targetIsInBatch) {
       return res.status(400).json({ error: 'Target user is not in your batch' });
     }
 
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-    if (frozen) {
-      return res.status(403).json({
-        error: 'Voting disabled after freeze date',
-        freeze_date: batch?.freezeDate,
-      });
+    const writable = await ensureBatchWritable(batchId);
+    if (!writable.ok) {
+      return res.status(writable.status).json({ error: writable.error });
     }
 
     const usedCount = await SuperlativeVote.countDocuments({
       fromUserId: req.user._id,
       superlativeId,
-      batchId: userBatch.batchId,
+      batchId,
     });
 
     if (usedCount >= superlative.maxVotesPerUser) {
@@ -231,7 +218,7 @@ router.post('/:superlativeId/vote', authRequired, async (req, res) => {
       fromUserId: req.user._id,
       toUserId,
       superlativeId,
-      batchId: userBatch.batchId,
+      batchId,
     });
 
     const votesUsed = usedCount + 1;

@@ -32,7 +32,7 @@ export function HomePage() {
         if (session.has_completed_onboarding) {
           navigate('/app', { replace: true });
         } else {
-          navigate('/onboarding', { replace: true });
+          navigate('/onboard', { replace: true });
         }
       } catch {
         localStorage.removeItem('access_token');

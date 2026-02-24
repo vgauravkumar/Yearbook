@@ -106,10 +106,16 @@ type ReactionState = {
 
 type HubTab = 'discover' | 'pulse' | 'bookmarks' | 'memories';
 type SortMode = 'trending' | 'support' | 'alphabetical';
+type InviteModalState = {
+  batchId: string;
+  inviteCode: string;
+};
 
 const PIN_STORAGE_KEY = 'yearbook:pinned-profiles';
 const REACTION_STORAGE_KEY = 'yearbook:quick-reactions';
 const NOTE_STORAGE_KEY = 'yearbook:pinned-notes';
+const PENDING_INVITE_MODAL_KEY = 'yearbook:pending_invite_modal';
+const DISMISSED_INVITE_MODAL_PREFIX = 'yearbook:invite-modal-dismissed:';
 
 function readStoredStringArray(key: string): string[] {
   try {
@@ -241,6 +247,8 @@ export function DirectoryPage() {
     storyIndex: number;
     itemIndex: number;
   } | null>(null);
+  const [inviteModal, setInviteModal] = useState<InviteModalState | null>(null);
+  const [copyingInvite, setCopyingInvite] = useState(false);
 
   const [pinnedIds, setPinnedIds] = useState<string[]>(() =>
     readStoredStringArray(PIN_STORAGE_KEY),
@@ -265,7 +273,7 @@ export function DirectoryPage() {
         const me: MeResponse = meResponse.data;
 
         if (!me.batch) {
-          navigate('/onboarding', { replace: true });
+          navigate('/onboard', { replace: true });
           return;
         }
 
@@ -273,6 +281,26 @@ export function DirectoryPage() {
         setViewerName(me.full_name);
         setViewerProfilePictureUrl(me.profile_picture_url ?? '');
         setBatch(me.batch);
+
+        try {
+          const pendingRaw = localStorage.getItem(PENDING_INVITE_MODAL_KEY);
+          const dismissedKey = `${DISMISSED_INVITE_MODAL_PREFIX}${me.batch.id}`;
+          if (pendingRaw && !localStorage.getItem(dismissedKey)) {
+            const pending = JSON.parse(pendingRaw) as Partial<InviteModalState>;
+            if (
+              pending.batchId === me.batch.id &&
+              typeof pending.inviteCode === 'string' &&
+              pending.inviteCode.length > 0
+            ) {
+              setInviteModal({
+                batchId: pending.batchId,
+                inviteCode: pending.inviteCode,
+              });
+            }
+          }
+        } catch {
+          // Ignore malformed local storage payloads.
+        }
 
         const [studentResponse, superlativeResponse] = await Promise.all([
           api.get(`/api/v1/batches/${me.batch.id}/students`, {
@@ -354,6 +382,10 @@ export function DirectoryPage() {
   const frozen = useMemo(() => isBatchFrozen(batch), [batch]);
   const batchLabel = useMemo(() => formatBatchLabel(batch), [batch]);
   const freezeDateLabel = useMemo(() => formatFreezeDate(batch), [batch]);
+  const inviteLink = useMemo(
+    () => (inviteModal ? `https://meracto.com/join/${inviteModal.inviteCode}` : ''),
+    [inviteModal],
+  );
 
   const sortedStudents = useMemo(() => {
     const list = [...students];
@@ -491,6 +523,30 @@ export function DirectoryPage() {
   function handleLogout() {
     localStorage.removeItem('access_token');
     navigate('/', { replace: true });
+  }
+
+  function dismissInviteModal() {
+    if (!inviteModal) return;
+    localStorage.setItem(
+      `${DISMISSED_INVITE_MODAL_PREFIX}${inviteModal.batchId}`,
+      '1',
+    );
+    localStorage.removeItem(PENDING_INVITE_MODAL_KEY);
+    setInviteModal(null);
+  }
+
+  async function copyInviteLink() {
+    if (!inviteLink) return;
+
+    setCopyingInvite(true);
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setNotice({ tone: 'success', message: 'Invite link copied.' });
+    } catch {
+      setNotice({ tone: 'error', message: 'Unable to copy invite link.' });
+    } finally {
+      setCopyingInvite(false);
+    }
   }
 
   function togglePin(studentId: string) {
@@ -1669,6 +1725,35 @@ export function DirectoryPage() {
           </section>
         )}
       </main>
+
+      {inviteModal && (
+        <div className="invite-modal-overlay" role="presentation" onClick={dismissInviteModal}>
+          <article
+            className="panel invite-modal-card"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="eyebrow">Batch invite</p>
+            <h2>You just created your batch&apos;s yearbook.</h2>
+            <p>Share this link with your batchmates so they join the same group:</p>
+            <code className="invite-link">{inviteLink}</code>
+            <div className="invite-modal-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={copyInviteLink}
+                disabled={copyingInvite}
+              >
+                {copyingInvite ? 'Copying...' : 'Copy link'}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={dismissInviteModal}>
+                Dismiss
+              </button>
+            </div>
+          </article>
+        </div>
+      )}
 
       {currentStory && (
         <div className="story-viewer-overlay" role="presentation" onClick={closeStoryViewer}>

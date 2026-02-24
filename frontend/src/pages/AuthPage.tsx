@@ -6,10 +6,18 @@ import { getApiErrorMessage } from '../utils/errors';
 
 type Mode = 'login' | 'register';
 
+function sanitizeNextPath(rawValue: string | null): string {
+  if (!rawValue) return '/app';
+  if (!rawValue.startsWith('/')) return '/app';
+  if (rawValue.startsWith('//')) return '/app';
+  return rawValue;
+}
+
 export function AuthPage() {
   const AUTH_SUBMIT_COOLDOWN_MS = 3000;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const redirectPath = sanitizeNextPath(searchParams.get('next'));
   const [mode, setMode] = useState<Mode>('register');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -53,15 +61,16 @@ export function AuthPage() {
         });
         setMode('login');
         setNotice('Account created. Log in with your credentials to continue.');
+        setCooldownUntil(0);
       } else {
         const response = await api.post('/api/v1/auth/login', { email, password });
         localStorage.setItem('access_token', response.data.access_token);
-        navigate('/app');
+        navigate(redirectPath, { replace: true });
       }
     } catch (errorValue: unknown) {
       setError(getApiErrorMessage(errorValue, 'Something went wrong'));
-    } finally {
       setCooldownUntil(Date.now() + AUTH_SUBMIT_COOLDOWN_MS);
+    } finally {
       setLoading(false);
     }
   }

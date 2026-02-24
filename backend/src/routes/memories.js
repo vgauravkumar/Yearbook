@@ -3,7 +3,6 @@ import { logger } from '../utils/logger.js';
 import { Filter } from 'bad-words';
 
 import { authRequired } from '../middleware/auth.js';
-import { UserBatch } from '../models/UserBatch.js';
 import { Batch } from '../models/Batch.js';
 import { Memory } from '../models/Memory.js';
 import { MemoryReaction } from '../models/MemoryReaction.js';
@@ -20,20 +19,25 @@ import {
   isS3NotFoundError,
 } from '../services/imageService.js';
 import { signMediaUrl } from '../services/mediaUrlService.js';
+import {
+  ensureBatchWritable,
+  getCurrentBatchMembershipByUserId,
+} from '../services/batchService.js';
 
 const router = express.Router();
 const profanityFilter = new Filter();
 
-async function ensureNotFrozen(batchId) {
-  const batch = await Batch.findById(batchId);
-  if (!batch) return { frozen: false, batch: null };
+async function getViewerBatch(userId) {
+  const membership = await getCurrentBatchMembershipByUserId(userId);
+  if (!membership?.batchId) {
+    return null;
+  }
 
-  const now = new Date();
-  const freezeAt = batch.freezeDate ? new Date(batch.freezeDate).getTime() : null;
-  const isFrozen =
-    batch.isFrozen || (freezeAt && now.getTime() > freezeAt);
-
-  return { frozen: isFrozen, batch };
+  const batch = await Batch.findById(membership.batchId).lean();
+  return {
+    batchId: membership.batchId,
+    batch,
+  };
 }
 
 async function mapMemory(memory, likeCountMap, likedMemoryIds) {
@@ -70,18 +74,13 @@ async function mapMemory(memory, likeCountMap, likedMemoryIds) {
 // GET /api/v1/memories/feed
 router.get('/feed', authRequired, async (req, res) => {
   try {
-    const userBatch = await UserBatch.findOne({
-      userId: req.user._id,
-      isPrimary: true,
-    }).lean();
+    const viewerBatch = await getViewerBatch(req.user._id);
 
-    if (!userBatch) {
+    if (!viewerBatch?.batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-
-    const memories = await Memory.find({ batchId: userBatch.batchId })
+    const memories = await Memory.find({ batchId: viewerBatch.batchId })
       .sort({ createdAt: -1 })
       .limit(150)
       .populate('userId', 'fullName profilePictureKey')
@@ -174,8 +173,8 @@ router.get('/feed', authRequired, async (req, res) => {
     return res.json({
       stories,
       reels: reels.slice(0, 100),
-      can_post: !frozen,
-      freeze_date: batch?.freezeDate ?? null,
+      can_post: !viewerBatch.batch?.isFrozen,
+      freeze_date: viewerBatch.batch?.freezeDate ?? null,
     });
   } catch (err) {
     logger.error('Memories route failed', { error: err });
@@ -188,21 +187,15 @@ router.post('/', authRequired, async (req, res) => {
   let uploadedObjectKey = null;
 
   try {
-    const userBatch = await UserBatch.findOne({
-      userId: req.user._id,
-      isPrimary: true,
-    }).lean();
+    const viewerBatch = await getViewerBatch(req.user._id);
 
-    if (!userBatch) {
+    if (!viewerBatch?.batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-    if (frozen) {
-      return res.status(403).json({
-        error: 'Posting memories disabled after freeze date',
-        freeze_date: batch?.freezeDate,
-      });
+    const writable = await ensureBatchWritable(viewerBatch.batchId);
+    if (!writable.ok) {
+      return res.status(writable.status).json({ error: writable.error });
     }
 
     const objectKey =
@@ -254,7 +247,7 @@ router.post('/', authRequired, async (req, res) => {
 
     const memory = await Memory.create({
       userId: req.user._id,
-      batchId: userBatch.batchId,
+      batchId: viewerBatch.batchId,
       mediaKey: objectKey,
       mediaType,
       thumbnailKey,
@@ -302,17 +295,14 @@ router.post('/:memoryId/react', authRequired, async (req, res) => {
   try {
     const { memoryId } = req.params;
 
-    const userBatch = await UserBatch.findOne({
-      userId: req.user._id,
-      isPrimary: true,
-    }).lean();
+    const viewerBatch = await getViewerBatch(req.user._id);
 
-    if (!userBatch) {
+    if (!viewerBatch?.batchId) {
       return res.status(400).json({ error: 'User not onboarded' });
     }
 
     const memory = await Memory.findById(memoryId).lean();
-    if (!memory || memory.batchId.toString() !== userBatch.batchId.toString()) {
+    if (!memory || memory.batchId.toString() !== viewerBatch.batchId.toString()) {
       return res.status(404).json({ error: 'Memory not found' });
     }
 
@@ -320,12 +310,9 @@ router.post('/:memoryId/react', authRequired, async (req, res) => {
       return res.status(400).json({ error: 'Cannot react to your own memory' });
     }
 
-    const { frozen, batch } = await ensureNotFrozen(userBatch.batchId);
-    if (frozen) {
-      return res.status(403).json({
-        error: 'Interactions disabled after freeze date',
-        freeze_date: batch?.freezeDate,
-      });
+    const writable = await ensureBatchWritable(viewerBatch.batchId);
+    if (!writable.ok) {
+      return res.status(writable.status).json({ error: writable.error });
     }
 
     const existing = await MemoryReaction.findOne({
@@ -370,6 +357,11 @@ router.delete('/:memoryId', authRequired, async (req, res) => {
 
     if (memory.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Only the creator can delete this memory' });
+    }
+
+    const writable = await ensureBatchWritable(memory.batchId);
+    if (!writable.ok) {
+      return res.status(writable.status).json({ error: writable.error });
     }
 
     await MemoryReaction.deleteMany({ memoryId: memory._id });
