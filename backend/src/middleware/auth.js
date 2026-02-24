@@ -23,3 +23,30 @@ export async function authRequired(req, res, next) {
   }
 }
 
+export async function authOptional(req, _res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    next();
+    return;
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const payload = jwt.verify(token, env.jwtSecret);
+    const user = await User.findById(payload.sub);
+
+    if (!user || !user.isActive) {
+      req.user = null;
+      next();
+      return;
+    }
+
+    req.user = user;
+    next();
+  } catch {
+    req.user = null;
+    next();
+  }
+}

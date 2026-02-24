@@ -303,13 +303,14 @@ export function DirectoryPage() {
         }
 
         const [studentResponse, superlativeResponse] = await Promise.all([
-          api.get(`/api/v1/batches/${me.batch.id}/students`, {
+          api.get(`/api/v1/batches/${me.batch.id}/members`, {
             params: { page: 1, limit: 300 },
           }),
           api.get('/api/v1/superlatives'),
         ]);
 
-        const loadedStudents: StudentTile[] = studentResponse.data.students ?? [];
+        const loadedStudents: StudentTile[] =
+          studentResponse.data.members ?? studentResponse.data.students ?? [];
         setStudents(loadedStudents);
         setSuperlatives(superlativeResponse.data.superlatives ?? []);
 

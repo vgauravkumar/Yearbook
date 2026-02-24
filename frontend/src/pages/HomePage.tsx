@@ -63,10 +63,13 @@ export function HomePage() {
         </div>
 
         <div className="nav-actions">
+          <Link className="btn btn-secondary landing-secondary-cta" to="/explore">
+            Explore yearbooks
+          </Link>
           <Link className="btn btn-ghost" to="/auth">
             Log in
           </Link>
-          <Link className="btn btn-primary" to="/auth">
+          <Link className="btn btn-primary" to="/auth?mode=signup">
             Start now
           </Link>
         </div>
@@ -82,11 +85,11 @@ export function HomePage() {
               your class pulse in one app.
             </p>
             <div className="landing-cta-row">
-              <Link className="btn btn-primary" to="/auth">
+              <Link className="btn btn-primary" to="/auth?mode=signup">
                 Build my yearbook
               </Link>
-              <Link className="btn btn-secondary" to="/auth">
-                See live campus hub
+              <Link className="btn btn-secondary landing-secondary-cta" to="/explore">
+                Explore yearbooks
               </Link>
             </div>
             <div className="landing-metrics">

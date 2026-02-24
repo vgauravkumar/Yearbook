@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthPage } from './pages/AuthPage';
 import { DirectoryPage } from './pages/DirectoryPage';
+import { ExplorePage } from './pages/ExplorePage';
 import { HomePage } from './pages/HomePage';
 import { JoinBatchPage } from './pages/JoinBatchPage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -33,6 +34,7 @@ function App() {
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/join/:inviteCode" element={<JoinBatchPage />} />
           <Route path="/join/batch/:batchId" element={<JoinBatchPage />} />
+          <Route path="/explore" element={<ExplorePage />} />
           <Route path="/onboard" element={<OnboardingPage />} />
           <Route path="/app" element={<DirectoryPage />} />
           <Route path="/directory" element={<Navigate to="/app" replace />} />
