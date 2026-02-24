@@ -74,22 +74,39 @@ function sortByBatchRecency(left, right) {
 }
 
 async function resolvePreviewAvatars(userIds, maxAvatars = 4) {
-  const previewIds = userIds.slice(0, maxAvatars);
-  if (previewIds.length === 0) return [];
+  const orderedIds = [
+    ...new Set(userIds.map((entry) => toIdString(entry)).filter((entry) => entry.length > 0)),
+  ];
+  if (orderedIds.length === 0) return [];
 
   const previewUsers = await User.find(
-    { _id: { $in: previewIds } },
+    { _id: { $in: orderedIds } },
     { _id: 1, profilePictureKey: 1 },
   ).lean();
 
-  const previewUsersById = new Map(
-    previewUsers.map((user) => [toIdString(user._id), user]),
-  );
+  const profileKeyByUserId = new Map();
+  for (const user of previewUsers) {
+    if (!user?.profilePictureKey) continue;
+    profileKeyByUserId.set(toIdString(user._id), user.profilePictureKey);
+  }
+
+  const previewKeys = [];
+  for (const userId of orderedIds) {
+    const profileKey = profileKeyByUserId.get(userId);
+    if (!profileKey) continue;
+
+    previewKeys.push(profileKey);
+    if (previewKeys.length >= maxAvatars) {
+      break;
+    }
+  }
+
+  if (previewKeys.length === 0) {
+    return [];
+  }
 
   const signed = await Promise.all(
-    previewIds.map((userId) =>
-      signMediaUrl(previewUsersById.get(toIdString(userId))?.profilePictureKey),
-    ),
+    previewKeys.map((profileKey) => signMediaUrl(profileKey)),
   );
 
   return signed.filter((entry) => typeof entry === 'string' && entry.length > 0);

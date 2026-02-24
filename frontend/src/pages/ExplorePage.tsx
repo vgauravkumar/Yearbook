@@ -155,24 +155,19 @@ export function ExplorePage() {
                 </div>
 
                 <div className="explore-avatar-stack" aria-label="Member previews">
-                  {Array.from({
-                    length: Math.min(
-                      Math.max(batch.previewAvatars.length, Math.min(batch.memberCount, 4)),
-                      4,
-                    ),
-                  }).map((_, index) => {
-                    const avatarUrl = batch.previewAvatars[index];
-
-                    return (
+                  {batch.previewAvatars.length > 0 ? (
+                    batch.previewAvatars.slice(0, 4).map((avatarUrl, index) => (
                       <span
                         key={`${batch._id}-avatar-${index}`}
                         className="explore-avatar"
                         style={{ zIndex: 4 - index }}
                       >
-                        {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="explore-avatar-fallback" />}
+                        <img src={avatarUrl} alt="" />
                       </span>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    <span className="muted explore-no-avatars">No profile photos yet</span>
+                  )}
                 </div>
 
                 <Link className="btn btn-secondary explore-view-link" to={`/join/${batch.inviteCode}`}>
